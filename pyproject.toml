@@ -18,6 +18,7 @@ filterwarnings = [
     "ignore:Using .httpx. with .starlette.testclient.",
     # Os testes usam propositalmente a chave JWT de desenvolvimento.
     "ignore:JWT_SECRET não definido:RuntimeWarning",
+    "ignore:ADMIN_INITIAL_PASSWORD não definido:RuntimeWarning",
 ]
 
 [tool.ruff]

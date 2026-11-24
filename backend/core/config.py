@@ -31,6 +31,9 @@ _BANCO_PADRAO = f"sqlite:///{(DIRETORIO_RAIZ / 'manutencao.db').as_posix()}"
 # JWT_SECRET com uma chave aleatória de pelo menos 32 bytes.
 _CHAVE_DESENVOLVIMENTO = "chave-local-de-desenvolvimento-com-mais-de-32-bytes"
 
+# Senha inicial exigida pelo enunciado (login admin / admin123).
+_SENHA_ADMIN_PADRAO = "admin123"
+
 
 @dataclass(frozen=True)
 class Configuracoes:
@@ -76,6 +79,15 @@ def _validar(config: Configuracoes) -> None:
             stacklevel=2,
         )
 
+    if config.admin_senha_inicial == _SENHA_ADMIN_PADRAO:
+        # Credencial exigida pelo enunciado do estudo de caso; nunca use em produção.
+        warnings.warn(
+            "ADMIN_INITIAL_PASSWORD não definido: usando a senha padrão do estudo de caso. "
+            "Defina ADMIN_INITIAL_PASSWORD fora do ambiente local.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+
     if len(config.jwt_secret.encode("utf-8")) < 32:
         raise RuntimeError("JWT_SECRET deve ter pelo menos 32 bytes para HS256.")
 
@@ -100,7 +112,7 @@ def carregar_configuracoes() -> Configuracoes:
         sessao_inatividade_minutos=30,
         refresh_token_dias=7,
         admin_username=os.getenv("ADMIN_USERNAME", "admin").strip().lower(),
-        admin_senha_inicial=os.getenv("ADMIN_INITIAL_PASSWORD", "admin123"),
+        admin_senha_inicial=os.getenv("ADMIN_INITIAL_PASSWORD", _SENHA_ADMIN_PADRAO),
         cors_origens=tuple(o.strip() for o in origens.split(",") if o.strip()),
     )
 
