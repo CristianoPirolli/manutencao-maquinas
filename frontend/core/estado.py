@@ -22,11 +22,8 @@ _ESTADO_INICIAL = {
     "refresh_expira_em": None,
     "horario_expiracao": None,
     "session_idle_seconds": SESSION_IDLE_SECONDS,
-    # Muda a ``key`` da tabela de registros para descartar seleções antigas.
+    # Muda a ``key`` das tabelas para descartar seleções antigas após salvar.
     "geracao_tabela": 0,
-    # Id da manutenção / máquina cuja janela de edição deve abrir neste rerun.
-    "editar_id": None,
-    "editar_maquina_id": None,
     # Mensagem a exibir como toast no próximo rerun (ex.: após salvar).
     "aviso_pendente": None,
 }
@@ -100,7 +97,6 @@ def limpar_sessao() -> None:
     for chave in (
         "token", "refresh_token", "usuario", "sessao_id",
         "access_expira_em", "refresh_expira_em", "horario_expiracao",
-        "editar_id", "editar_maquina_id",
     ):
         st.session_state[chave] = None
     st.session_state.session_idle_seconds = SESSION_IDLE_SECONDS

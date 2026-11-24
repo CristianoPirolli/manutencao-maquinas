@@ -86,13 +86,20 @@ apenas define **a ordem das telas**; cada tela é uma função `renderizar_*` em
 | `core/api_client.py` | Única porta de saída para a API; renova o token em caso de 401 |
 | `core/estado.py` | Única porta de acesso ao `st.session_state` |
 | `core/formatadores.py` | Funções puras (testáveis sem Streamlit) |
+| `core/crud.py` | Barra Nova / Editar / Excluir e tabela com seleção, usadas por Registros e Máquinas |
 | `apps/*/views.py` | Desenho das telas |
 | `apps/manutencoes/formulario.py` | Validação e serialização do formulário (pura) |
 | `apps/manutencoes/analise.py` | DataFrame, frase de destaque e proporção por tipo (pura) |
 | `apps/manutencoes/graficos.py` | Gráficos Altair com a paleta dos tipos de manutenção |
 | `.streamlit/config.toml` | Tema: cores, fontes Barlow e barra lateral |
 
-Cadastro e edição acontecem em janelas modais (`st.dialog`). Como a janela é
+As telas de cadastro seguem um padrão único: a barra de ações é um
+`st.container` criado antes da tabela e preenchido depois dela, quando a linha
+selecionada já é conhecida. A `key` da tabela inclui os ids exibidos, então
+filtrar ou salvar descarta a seleção antiga em vez de apontá-la para outro
+registro.
+
+Cadastro, edição e exclusão acontecem em janelas modais (`st.dialog`). Como a janela é
 um fragmento, interagir com ela re-executa só a janela; ao concluir, um
 `st.rerun()` completo fecha a janela, renova a tabela e exibe um aviso (toast).
 

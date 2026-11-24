@@ -1,4 +1,4 @@
-"""Aba de máquinas: lista, cadastro, edição e exclusão (janelas modais).
+"""Aba de máquinas: CRUD com barra de ações, busca e janelas modais.
 
 Também expõe :func:`listar_maquinas` e :func:`rotulo_maquina`, usadas pelo
 formulário de manutenção para montar a lista suspensa de máquinas.
@@ -6,13 +6,20 @@ formulário de manutenção para montar a lista suspensa de máquinas.
 
 from __future__ import annotations
 
-from functools import partial
+from html import escape
 
 import pandas as pd
 import streamlit as st
 
 from frontend.core.api_client import requisitar_api, validar_resposta_json
 from frontend.core.config import CHAVE_TABELA_MAQUINAS
+from frontend.core.crud import (
+    Permissoes,
+    barra_acoes,
+    botoes_confirmacao,
+    chave_tabela,
+    tabela_selecionavel,
+)
 from frontend.core.estado import concluir_operacao, possui_scope, registrar_atividade
 
 _CAMPOS_MAQUINA = ("id", "nome", "setor", "total_manutencoes")
@@ -47,82 +54,93 @@ def rotulo_maquina(maquina: dict) -> str:
 # --------------------------------------------------------------------------- #
 
 
-def _ao_selecionar(chave: str, ids: list[int]) -> None:
-    """Callback da tabela: agenda a janela de edição da máquina clicada."""
-    linhas = st.session_state[chave].selection.rows
-    if linhas:
-        st.session_state.editar_maquina_id = ids[linhas[0]]
-        st.session_state.geracao_tabela += 1
-        registrar_atividade()
+def _filtrar(maquinas: list[dict], termo: str) -> list[dict]:
+    """Filtra por trecho do nome ou do setor, sem diferenciar maiúsculas."""
+    termo = termo.strip().casefold()
+    if not termo:
+        return maquinas
+    return [
+        m for m in maquinas
+        if termo in m["nome"].casefold() or termo in (m.get("setor") or "").casefold()
+    ]
 
 
 def renderizar_maquinas() -> None:
-    """Lista de máquinas com o total de manutenções de cada uma."""
-    pode_criar = possui_scope("maquinas:create")
-    pode_gerenciar = possui_scope("maquinas:update") or possui_scope("maquinas:delete")
+    """CRUD de máquinas: barra de ações, busca e tabela selecionável."""
+    permissoes = Permissoes(
+        criar=possui_scope("maquinas:create"),
+        editar=possui_scope("maquinas:update"),
+        excluir=possui_scope("maquinas:delete"),
+    )
 
-    col_texto, col_acao = st.columns([4, 1.3], vertical_alignment="center")
-    with col_texto:
-        st.markdown(
-            "Equipamentos que podem receber manutenção. Uma máquina cadastrada aqui "
-            "aparece na lista ao registrar uma parada."
-        )
-    with col_acao:
-        if pode_criar and st.button(
-            "Cadastrar máquina", icon=":material/add:", width="stretch", key="btn_nova_maquina"
-        ):
-            registrar_atividade()
-            _dialogo_nova_maquina()
+    st.markdown(
+        "Equipamentos que podem receber manutenção. Uma máquina cadastrada aqui "
+        "aparece na lista ao registrar uma parada."
+    )
+    area_acoes = st.container(border=True)
 
     maquinas = listar_maquinas()
     if maquinas is None:
         return
 
+    termo = st.text_input(
+        "Buscar", placeholder="Nome ou setor da máquina", icon=":material/search:",
+        label_visibility="collapsed", on_change=registrar_atividade, key="busca_maquina",
+    )
+    encontradas = _filtrar(maquinas, termo)
+
+    selecionada: dict | None = None
     if not maquinas:
         st.info(
-            "Nenhuma máquina cadastrada. Cadastre a primeira para começar a registrar manutenções."
-            if pode_criar
+            "Nenhuma máquina cadastrada. Use Nova máquina para cadastrar a primeira."
+            if permissoes.criar
             else "Nenhuma máquina cadastrada. Peça a um administrador para cadastrar as máquinas.",
             icon=":material/precision_manufacturing:",
         )
-        return
+    elif not encontradas:
+        st.info("Nenhuma máquina corresponde à busca.", icon=":material/search_off:")
+    else:
+        df = pd.DataFrame(encontradas)[list(_CAMPOS_MAQUINA)]
+        total = len(df)
+        st.caption(
+            f"{total} de {len(maquinas)} {'máquina' if len(maquinas) == 1 else 'máquinas'}."
+        )
+        id_selecionado = tabela_selecionavel(
+            df,
+            chave_tabela(CHAVE_TABELA_MAQUINAS, df["id"].tolist()),
+            column_order=["nome", "setor", "total_manutencoes"],
+            column_config={
+                "nome": st.column_config.TextColumn("Máquina", width="large"),
+                "setor": st.column_config.TextColumn("Setor"),
+                "total_manutencoes": st.column_config.ProgressColumn(
+                    "Manutenções registradas", format="%d", min_value=0,
+                    max_value=max(int(df["total_manutencoes"].max()), 1),
+                ),
+            },
+        )
+        selecionada = next((m for m in encontradas if m["id"] == id_selecionado), None)
 
-    df = pd.DataFrame(maquinas)[list(_CAMPOS_MAQUINA)]
-    total = len(df)
-    st.caption(
-        f"{total} {'máquina cadastrada' if total == 1 else 'máquinas cadastradas'}."
-        + (" Clique em uma linha para editar." if pode_gerenciar else "")
+    total_hist = int(selecionada["total_manutencoes"]) if selecionada else 0
+    acao = barra_acoes(
+        area_acoes,
+        rotulo_novo="Nova máquina",
+        selecionado=rotulo_maquina(selecionada) if selecionada else None,
+        permissoes=permissoes,
+        chave="acoes_maquina",
+        motivo_sem_exclusao=(
+            f"Esta máquina tem {total_hist} "
+            f"{'manutenção registrada' if total_hist == 1 else 'manutenções registradas'} "
+            "e não pode ser excluída. Renomeie-a se precisar corrigir o cadastro."
+            if total_hist else None
+        ),
     )
 
-    chave = f"{CHAVE_TABELA_MAQUINAS}_{st.session_state.geracao_tabela}"
-    selecao = (
-        {"on_select": partial(_ao_selecionar, chave, df["id"].tolist()), "selection_mode": "single-row"}
-        if pode_gerenciar
-        else {}
-    )
-    st.dataframe(
-        df,
-        key=chave,
-        hide_index=True,
-        width="stretch",
-        height=min(420, 38 + 35 * total),
-        row_height=35,
-        column_order=["nome", "setor", "total_manutencoes"],
-        column_config={
-            "nome": st.column_config.TextColumn("Máquina", width="large"),
-            "setor": st.column_config.TextColumn("Setor"),
-            "total_manutencoes": st.column_config.ProgressColumn(
-                "Manutenções registradas", format="%d", min_value=0,
-                max_value=max(int(df["total_manutencoes"].max()), 1),
-            ),
-        },
-        **selecao,
-    )
-
-    id_editar = st.session_state.get("editar_maquina_id")
-    if id_editar is not None:
-        st.session_state.editar_maquina_id = None  # Abre uma única vez por clique.
-        _dialogo_editar_maquina(id_editar)
+    if acao == "novo":
+        _dialogo_nova_maquina()
+    elif acao == "editar" and selecionada:
+        _dialogo_editar_maquina(selecionada["id"])
+    elif acao == "excluir" and selecionada:
+        _dialogo_excluir_maquina(selecionada["id"])
 
 
 # --------------------------------------------------------------------------- #
@@ -179,7 +197,7 @@ def _dialogo_nova_maquina() -> None:
 
 @st.dialog("Editar máquina")
 def _dialogo_editar_maquina(id_maquina: int) -> None:
-    """Janela de edição; a exclusão só é oferecida para máquinas sem histórico."""
+    """Janela de edição de nome e setor."""
     response = requisitar_api("GET", f"/maquinas/{id_maquina}", autenticada=True, verificar_status=False)
     if response is not None and response.status_code == 404:
         st.warning("Esta máquina foi excluída por outro usuário. Feche a janela e atualize a lista.")
@@ -188,31 +206,38 @@ def _dialogo_editar_maquina(id_maquina: int) -> None:
     if atual is None:
         return
 
+    total = int(atual["total_manutencoes"])
+    if total:
+        st.caption(
+            f"O novo nome aparece nas {total} manutenções já registradas desta máquina."
+            if total > 1 else "O novo nome aparece na manutenção já registrada desta máquina."
+        )
+
     with st.form(f"form_editar_maquina_{id_maquina}", border=False):
         nome, setor = _campos(atual)
         salvar = st.form_submit_button(
             "Salvar alterações", type="primary", icon=":material/save:", width="stretch",
-            disabled=not possui_scope("maquinas:update"),
         )
     if salvar:
         registrar_atividade()
         _enviar("PUT", f"/maquinas/{id_maquina}", nome, setor, 200)
 
-    if not possui_scope("maquinas:delete"):
+
+@st.dialog("Excluir máquina")
+def _dialogo_excluir_maquina(id_maquina: int) -> None:
+    """Confirmação de exclusão; a API recusa (409) máquinas com histórico."""
+    response = requisitar_api("GET", f"/maquinas/{id_maquina}", autenticada=True, verificar_status=False)
+    if response is not None and response.status_code == 404:
+        st.warning("Esta máquina já foi excluída por outro usuário. Feche a janela e atualize a lista.")
+        return
+    atual = validar_resposta_json(response, contexto="a máquina", campos_obrigatorios=_CAMPOS_MAQUINA)
+    if atual is None:
         return
 
-    st.divider()
-    total = int(atual["total_manutencoes"])
-    if total:
-        st.caption(
-            f"{atual['nome']} tem {total} {'manutenção registrada' if total == 1 else 'manutenções registradas'} "
-            "e por isso não pode ser excluída. Renomeie-a se precisar corrigir o cadastro."
-        )
-        return
+    st.markdown(f"Excluir **{escape(rotulo_maquina(atual))}** do cadastro?")
+    st.caption("A exclusão é definitiva. Ela fica registrada na auditoria.")
 
-    confirmar = st.checkbox(f"Confirmo a exclusão definitiva de {atual['nome']}")
-    if st.button("Excluir máquina", icon=":material/delete:", disabled=not confirmar, width="stretch"):
-        registrar_atividade()
+    if botoes_confirmacao("Excluir máquina", f"excluir_maquina_{id_maquina}"):
         response = requisitar_api(
             "DELETE", f"/maquinas/{id_maquina}", autenticada=True, verificar_status=False
         )

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import InvalidOperation
-from functools import partial
 from html import escape
 
 import pandas as pd
@@ -20,6 +19,13 @@ from frontend.apps.manutencoes.analise import (
 from frontend.apps.manutencoes.formulario import manutencao_completa, validar_formulario
 from frontend.core.api_client import requisitar_api, validar_resposta_json
 from frontend.core.config import CAMPOS_MANUTENCAO, CHAVE_TABELA, CORES_TIPO, TIPOS_MANUTENCAO
+from frontend.core.crud import (
+    Permissoes,
+    barra_acoes,
+    botoes_confirmacao,
+    chave_tabela,
+    tabela_selecionavel,
+)
 from frontend.core.estado import concluir_operacao, possui_scope, registrar_atividade
 from frontend.core.estilo import faixa_advertencia
 from frontend.core.formatadores import formatar_horas, formatar_moeda, valor_decimal
@@ -200,68 +206,69 @@ def _filtros() -> dict[str, str]:
     return params
 
 
-def _ao_selecionar_linha(chave: str, ids: list[int]) -> None:
-    """Callback da tabela: agenda a janela de edição da linha clicada.
-
-    Incrementar ``geracao_tabela`` recria a tabela sem seleção, permitindo
-    clicar novamente na mesma linha depois de fechar a janela.
-    """
-    linhas = st.session_state[chave].selection.rows
-    if linhas:
-        st.session_state.editar_id = ids[linhas[0]]
-        st.session_state.geracao_tabela += 1
-        registrar_atividade()
+def _descrever(linha: pd.Series) -> str:
+    """Resumo de uma manutenção para a barra de ações e a janela de exclusão."""
+    return (
+        f"nº {linha['id']}, {linha['maquina']}, {linha['tipo']} em "
+        f"{linha['data']:%d/%m/%Y}"
+    )
 
 
 def renderizar_registros() -> None:
-    """Busca filtrada e tabela clicável que abre a janela de edição."""
+    """CRUD de manutenções: barra de ações, filtros e tabela selecionável."""
+    permissoes = Permissoes(
+        criar=possui_scope("manutencoes:create"),
+        editar=possui_scope("manutencoes:update"),
+        excluir=possui_scope("manutencoes:delete"),
+    )
+    area_acoes = st.container(border=True)
+
     params = _filtros()
     df = _carregar_dataframe("/manutencoes/busca", "a lista de manutenções", params=params)
 
+    selecionada: pd.Series | None = None
     if df.empty:
         st.info(
             "Nenhuma manutenção corresponde aos filtros. Ajuste a busca ou limpe o tipo selecionado.",
             icon=":material/search_off:",
         )
-        return
+    else:
+        total = len(df)
+        st.caption(f"{total} {'manutenção encontrada' if total == 1 else 'manutenções encontradas'}.")
 
-    total = len(df)
-    st.caption(
-        f"{total} {'manutenção encontrada' if total == 1 else 'manutenções encontradas'}. "
-        "Clique em uma linha para editar."
+        id_selecionado = tabela_selecionavel(
+            df.assign(tipo=df["tipo"].str.capitalize()),
+            chave_tabela(CHAVE_TABELA, df["id"].tolist()),
+            column_order=["data", "maquina", "tipo", "custo", "horas", "id"],
+            column_config={
+                "id": st.column_config.NumberColumn("Nº", width="small"),
+                "data": st.column_config.DateColumn("Data", format="DD/MM/YYYY", width="small"),
+                "maquina": st.column_config.TextColumn("Máquina", width="large"),
+                "tipo": st.column_config.TextColumn("Tipo", width="small"),
+                "custo": st.column_config.NumberColumn("Custo (R$)", format="%.2f"),
+                "horas": st.column_config.ProgressColumn(
+                    "Horas paradas", format="%.1f h", min_value=0.0,
+                    max_value=max(float(df["horas"].max()), 1.0),
+                ),
+            },
+        )
+        if id_selecionado is not None:
+            selecionada = df.loc[df["id"] == id_selecionado].iloc[0]
+
+    acao = barra_acoes(
+        area_acoes,
+        rotulo_novo="Nova manutenção",
+        selecionado=f"manutenção {_descrever(selecionada)}" if selecionada is not None else None,
+        permissoes=permissoes,
+        chave="acoes_manutencao",
     )
 
-    exibicao = df.assign(tipo=df["tipo"].str.capitalize())
-    ids = df["id"].tolist()
-    chave = f"{CHAVE_TABELA}_{st.session_state.geracao_tabela}"
-
-    st.dataframe(
-        exibicao,
-        key=chave,
-        hide_index=True,
-        width="stretch",
-        height=min(420, 38 + 35 * total),
-        row_height=35,
-        on_select=partial(_ao_selecionar_linha, chave, ids),
-        selection_mode="single-row",
-        column_order=["data", "maquina", "tipo", "custo", "horas", "id"],
-        column_config={
-            "id": st.column_config.NumberColumn("Nº", width="small"),
-            "data": st.column_config.DateColumn("Data", format="DD/MM/YYYY", width="small"),
-            "maquina": st.column_config.TextColumn("Máquina", width="large"),
-            "tipo": st.column_config.TextColumn("Tipo", width="small"),
-            "custo": st.column_config.NumberColumn("Custo (R$)", format="%.2f"),
-            "horas": st.column_config.ProgressColumn(
-                "Horas paradas", format="%.1f h", min_value=0.0,
-                max_value=max(float(df["horas"].max()), 1.0),
-            ),
-        },
-    )
-
-    id_editar = st.session_state.editar_id
-    if id_editar is not None:
-        st.session_state.editar_id = None  # Abre uma única vez por clique.
-        _dialogo_edicao(id_editar)
+    if acao == "novo":
+        _dialogo_nova_manutencao()
+    elif acao == "editar" and selecionada is not None:
+        _dialogo_edicao(int(selecionada["id"]))
+    elif acao == "excluir" and selecionada is not None:
+        _dialogo_exclusao(int(selecionada["id"]), _descrever(selecionada), selecionada["maquina"])
 
 
 # --------------------------------------------------------------------------- #
@@ -397,17 +404,22 @@ def _carregar_para_edicao(id_manutencao: int) -> dict | None:
         return None
 
 
-def _zona_exclusao(id_manutencao: int, maquina: str) -> None:
-    """Exclusão com confirmação explícita (somente com ``manutencoes:delete``)."""
-    st.divider()
-    confirmar = st.checkbox(f"Confirmo a exclusão definitiva da manutenção de {maquina}")
-    if st.button(
-        "Excluir manutenção", icon=":material/delete:", disabled=not confirmar, width="stretch"
-    ):
-        registrar_atividade()
+@st.dialog("Excluir manutenção")
+def _dialogo_exclusao(id_manutencao: int, descricao: str, maquina: str) -> None:
+    """Confirmação de exclusão (somente com ``manutencoes:delete``)."""
+    st.markdown(f"Excluir a manutenção {escape(descricao)}?")
+    st.caption(
+        "A exclusão é definitiva e reduz os totais de custo e de horas paradas. "
+        "Ela fica registrada na auditoria."
+    )
+
+    if botoes_confirmacao("Excluir manutenção", f"excluir_manutencao_{id_manutencao}"):
         response = requisitar_api(
             "DELETE", f"/manutencoes/{id_manutencao}", autenticada=True, verificar_status=False
         )
+        if response is not None and response.status_code == 404:
+            st.warning("Esta manutenção já foi excluída por outro usuário. Feche a janela.")
+            return
         resultado = validar_resposta_json(
             response, contexto="a confirmação da exclusão", campos_obrigatorios=("mensagem",)
         )
@@ -417,7 +429,7 @@ def _zona_exclusao(id_manutencao: int, maquina: str) -> None:
 
 @st.dialog("Editar manutenção", width="large")
 def _dialogo_edicao(id_manutencao: int) -> None:
-    """Janela de edição (e exclusão, para administradores) de uma manutenção."""
+    """Janela de edição de uma manutenção."""
     atual = _carregar_para_edicao(id_manutencao)
     if atual is None:
         return
@@ -425,19 +437,14 @@ def _dialogo_edicao(id_manutencao: int) -> None:
     if maquinas is None:
         return
 
-    pode_editar = possui_scope("manutencoes:update")
     st.caption(f"Registro nº {id_manutencao}")
 
     with st.form(f"form_edicao_{id_manutencao}", border=False):
         campos = _campos_formulario(maquinas, atual)
         salvar = st.form_submit_button(
-            "Salvar alterações", type="primary", icon=":material/save:",
-            width="stretch", disabled=not pode_editar,
+            "Salvar alterações", type="primary", icon=":material/save:", width="stretch",
         )
 
     if salvar:
         registrar_atividade()
         _enviar("PUT", f"/manutencoes/{id_manutencao}", campos, status_esperado=200, acao="salva")
-
-    if possui_scope("manutencoes:delete"):
-        _zona_exclusao(id_manutencao, atual["maquina"])

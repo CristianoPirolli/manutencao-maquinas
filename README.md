@@ -179,6 +179,7 @@ manutencao/
 │   │   ├── api_client.py         # HTTP com renovação automática de token
 │   │   ├── estado.py             # Gerenciamento do st.session_state
 │   │   ├── formatadores.py       # Moeda, horas e tempo (funções puras)
+│   │   ├── crud.py               # Barra de ações e tabela selecionável (CRUD)
 │   │   └── estilo.py             # Identidade visual (CSS complementar ao tema)
 │   └── apps/                     # Telas por domínio
 │       ├── autenticacao/         # Tela de acesso, perfil e barra lateral
@@ -291,10 +292,13 @@ advertência amarela, e cada tipo de manutenção com sua cor —
   horas paradas e o peso das corretivas no custo; abaixo, os indicadores (custo
   acumulado, horas paradas, intervenções e custo médio), a proporção por tipo e
   os gráficos de horas paradas por máquina e de custo por mês.
-- **Registros:** busca por máquina, tipo e parada mínima; clique em uma linha
-  para abrir a janela de edição. A exclusão (admin) exige confirmação.
-- **Máquinas:** lista das máquinas com o total de manutenções de cada uma. O
-  admin cadastra, renomeia e exclui (só máquinas sem histórico).
+- **Registros** e **Máquinas** seguem o mesmo CRUD: uma barra fixa acima da
+  tabela com **Nova**, **Editar** e **Excluir**. Selecione uma linha para
+  habilitar Editar e Excluir; cada ação abre uma janela, e a exclusão pede
+  confirmação. Botões que o perfil não permite aparecem desabilitados.
+- **Registros:** filtros por máquina, tipo e parada mínima.
+- **Máquinas:** busca por nome ou setor e total de manutenções de cada
+  máquina. Uma máquina com manutenções não pode ser excluída, só renomeada.
 - **Registrar manutenção:** botão no cabeçalho que abre o formulário em uma
   janela; a máquina é escolhida numa lista suspensa com busca, alimentada pelo
   cadastro de máquinas.
