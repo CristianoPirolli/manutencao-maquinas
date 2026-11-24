@@ -11,6 +11,8 @@ industriais**.
 | **Frontend** | Interface web com [Streamlit](https://streamlit.io/) |
 | **Segurança** | OAuth2 Password Flow, JWT, scopes, refresh token com rotação, sessões com timeout e auditoria |
 
+![Visão geral do sistema](docs/img/02-visao-geral.png)
+
 ## 👥 Integrantes
 
 - **Cristiano Pirolli**
@@ -20,16 +22,70 @@ industriais**.
 
 ## Sumário
 
-1. [Estratégia adotada](#-estratégia-adotada)
-2. [Modelo de dados (MER)](#-modelo-de-dados-mer)
-3. [Estrutura do projeto](#-estrutura-do-projeto)
-4. [Instalação](#-instalação)
-5. [Execução](#-execução)
-6. [Execução com Docker](#-execução-com-docker)
-7. [Usando o sistema](#-usando-o-sistema)
-8. [Configuração](#%EF%B8%8F-configuração)
-9. [Solução de problemas](#-solução-de-problemas)
-10. [Documentação complementar](#-documentação-complementar)
+1. [Telas](#%EF%B8%8F-telas)
+2. [Estratégia adotada](#-estratégia-adotada)
+3. [Modelo de dados (MER)](#-modelo-de-dados-mer)
+4. [Estrutura do projeto](#-estrutura-do-projeto)
+5. [Instalação](#-instalação)
+6. [Execução](#-execução)
+7. [Execução com Docker](#-execução-com-docker)
+8. [Usando o sistema](#-usando-o-sistema)
+9. [Configuração](#%EF%B8%8F-configuração)
+10. [Solução de problemas](#-solução-de-problemas)
+11. [Documentação complementar](#-documentação-complementar)
+
+---
+
+## 🖼️ Telas
+
+Capturas feitas com os dados de exemplo da primeira execução.
+
+### Acesso
+
+Login e criação de conta. As cores dos três tipos de manutenção já aparecem
+aqui e se repetem em todo o sistema.
+
+![Tela de acesso](docs/img/01-login.png)
+
+### Visão geral
+
+Frase de destaque gerada dos dados, indicadores de custo e horas paradas,
+proporção por tipo, gráficos e a tabela de confiabilidade (MTTR, MTBF e
+disponibilidade), com a máquina menos disponível no topo.
+
+![Visão geral](docs/img/02-visao-geral.png)
+
+### Registros (CRUD de manutenções)
+
+Barra **Nova / Editar / Excluir** acima da tabela; Editar e Excluir são
+habilitados ao selecionar uma linha. Filtros por máquina, tipo e parada mínima.
+
+![Registros com uma manutenção selecionada](docs/img/03-registros.png)
+
+| Editar manutenção | Registrar manutenção |
+|---|---|
+| ![Janela de edição](docs/img/04-editar-manutencao.png) | ![Lista suspensa de máquinas](docs/img/05-nova-manutencao.png) |
+| A janela abre preenchida com o registro selecionado. | A máquina é escolhida na lista das máquinas cadastradas. |
+
+### Máquinas (CRUD de máquinas)
+
+Mesma barra de ações, com busca por nome ou setor. Excluir fica desabilitado
+para máquinas com manutenções registradas.
+
+![Máquinas](docs/img/06-maquinas.png)
+
+### Auditoria (somente admin)
+
+Cada login, criação, edição, exclusão e acesso negado fica registrado, com
+filtro por resultado.
+
+![Auditoria](docs/img/07-auditoria.png)
+
+### API (Swagger)
+
+Documentação interativa gerada pelo FastAPI em `/docs`.
+
+![Swagger da API](docs/img/08-swagger.png)
 
 ---
 
@@ -190,6 +246,7 @@ manutencao/
 │
 ├── .streamlit/config.toml        # Tema: cores, fontes e barra lateral
 ├── docs/
+│   ├── img/                      # Capturas de tela usadas neste README
 │   ├── ARQUITETURA.md            # Decisões de arquitetura e fluxos
 │   └── API.md                    # Referência dos endpoints
 ├── docker-compose.yml            # Sobe API e interface em containers separados
