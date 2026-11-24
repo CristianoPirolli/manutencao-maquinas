@@ -1,0 +1,102 @@
+# Referência da API
+
+Base: `http://127.0.0.1:8000` · Swagger: `/docs` · ReDoc: `/redoc`
+
+Rotas protegidas exigem o cabeçalho `Authorization: Bearer <access_token>`.
+Erros seguem o padrão do FastAPI: `{"detail": "..."}`.
+
+## Status
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| GET | `/` | — | Health check: `{"mensagem": "API está no ar!", "versao": "9"}` |
+
+## Autenticação
+
+| Método | Rota | Auth | Descrição |
+|---|---|---|---|
+| POST | `/token` | — | Login (form `username`, `password`, `scope` opcional) |
+| POST | `/refresh` | — | Corpo `{"refresh_token": "..."}`; devolve novo par de tokens |
+| POST | `/logout` | — | Corpo `{"refresh_token": "..."}`; encerra a sessão |
+
+Resposta de `/token` e `/refresh`:
+
+```json
+{
+  "access_token": "eyJhbGciOi...",
+  "refresh_token": "Yp3k...",
+  "token_type": "bearer",
+  "expires_in": 900,
+  "refresh_expires_in": 604800,
+  "session_idle_seconds": 1800,
+  "usuario": {
+    "id": 1,
+    "username": "admin",
+    "role": "admin",
+    "scopes": ["auditoria:read", "manutencoes:create", "manutencoes:delete",
+               "manutencoes:read", "manutencoes:update"],
+    "sessao_id": "0f1c..."
+  }
+}
+```
+
+## Usuários
+
+| Método | Rota | Scope | Descrição |
+|---|---|---|---|
+| POST | `/usuarios` | — | Cria conta comum: `{"username": "...", "senha": "..."}` (201, 409 se existir) |
+| GET | `/me` | qualquer | Perfil e scopes efetivos da sessão |
+
+## Manutenções
+
+| Método | Rota | Scope | Descrição |
+|---|---|---|---|
+| GET | `/manutencoes` | `manutencoes:read` | Todas, no formato `{id: manutencao}` |
+| GET | `/manutencoes/qtd` | `manutencoes:read` | `{"quantidade_total": 5}` |
+| GET | `/manutencoes/resumo` | `manutencoes:read` | `{"custo_total": "20580.50", "horas_paradas_total": "35.0", "moeda": "R$"}` |
+| GET | `/manutencoes/busca` | `manutencoes:read` | Filtros `maquina`, `tipo`, `min_horas`; mais recentes primeiro |
+| GET | `/manutencoes/{id}` | `manutencoes:read` | Uma manutenção (404 se não existir) |
+| POST | `/manutencoes` | `manutencoes:create` | Cria (201) |
+| PUT | `/manutencoes/{id}` | `manutencoes:update` | Substitui todos os campos |
+| DELETE | `/manutencoes/{id}` | `manutencoes:delete` | Exclui |
+
+Corpo de `POST` / `PUT`:
+
+```json
+{
+  "maquina": "Bobinadeira 01",
+  "tipo": "corretiva",
+  "data_manutencao": "2026-11-10",
+  "custo": "2780.50",
+  "horas_paradas": "8.5"
+}
+```
+
+Valores decimais são trafegados como texto para preservar a precisão.
+
+## Auditoria
+
+| Método | Rota | Scope | Descrição |
+|---|---|---|---|
+| GET | `/auditoria?limite=100` | `auditoria:read` | Últimos registros (1 a 500) |
+
+## Códigos de status
+
+| Código | Quando |
+|---|---|
+| 200 / 201 | Sucesso |
+| 400 | Scope solicitado não permitido ao perfil |
+| 401 | Token ausente, inválido ou expirado; sessão encerrada; credenciais inválidas |
+| 403 | Token válido, mas sem o scope exigido pela rota |
+| 404 | Manutenção inexistente |
+| 409 | Nome de usuário já cadastrado |
+| 422 | Dados de entrada inválidos (validação Pydantic) |
+
+## Exemplo com `curl`
+
+```bash
+TOKEN=$(curl -s -X POST http://127.0.0.1:8000/token \
+  -d "username=admin&password=admin123" | python -c "import sys,json;print(json.load(sys.stdin)['access_token'])")
+
+curl -s http://127.0.0.1:8000/manutencoes/resumo -H "Authorization: Bearer $TOKEN"
+```
