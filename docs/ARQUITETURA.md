@@ -116,7 +116,9 @@ sequenceDiagram
 ```
 
 Se o mesmo refresh token for usado duas vezes (vazamento ou requisições
-concorrentes), somente a primeira tentativa é aceita.
+concorrentes), a segunda tentativa é tratada como **reuso**: a sessão inteira
+é revogada, invalidando também o token emitido na rotação (detecção de reuso,
+RFC 6819 / OAuth 2.0 Security BCP). O usuário legítimo precisa entrar de novo.
 
 ### Encerramento de sessão
 

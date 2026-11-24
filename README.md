@@ -282,7 +282,7 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
-A suíte (64 testes) usa um banco SQLite temporário e cobre:
+A suíte (65 testes) usa um banco SQLite temporário e cobre:
 
 - login, scopes, refresh com rotação e proteção contra reuso, logout e timeout de sessão;
 - cadastro de usuários e restrições do perfil comum;

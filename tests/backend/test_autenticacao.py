@@ -97,6 +97,18 @@ def test_refresh_rotaciona_e_invalida_token_anterior(client):
     assert reuso.status_code == 401
 
 
+def test_reuso_de_refresh_token_revoga_a_sessao_inteira(client):
+    tokens = autenticar(client, *ADMIN)
+    novos = client.post("/refresh", json={"refresh_token": tokens["refresh_token"]}).json()
+
+    # Um atacante reapresenta o token antigo (já rotacionado)...
+    client.post("/refresh", json={"refresh_token": tokens["refresh_token"]})
+
+    # ...e a sessão é encerrada: nem o token novo nem o JWT novo valem mais.
+    assert client.post("/refresh", json={"refresh_token": novos["refresh_token"]}).status_code == 401
+    assert client.get("/me", headers=bearer(novos)).status_code == 401
+
+
 def test_refresh_token_desconhecido_retorna_401(client):
     response = client.post("/refresh", json={"refresh_token": "inexistente"})
     assert response.status_code == 401

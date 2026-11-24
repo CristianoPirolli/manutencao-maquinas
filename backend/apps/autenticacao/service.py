@@ -217,6 +217,11 @@ def renovar_tokens(session: Session, refresh_token: str) -> dict:
     username = usuario_db.username if usuario_db is not None else "desconhecido"
 
     if registro.revogado:
+        # Reuso de token já rotacionado indica possível vazamento: encerra a
+        # sessão inteira, invalidando também o token emitido na rotação
+        # (detecção de reuso recomendada pela RFC 6819 / OAuth 2.0 BCP).
+        if registro.sessao_id:
+            revogar_sessao(session, registro.sessao_id)
         _recusar(
             session, usuario=username,
             detalhes="Refresh token revogado ou já utilizado",
@@ -284,11 +289,15 @@ def renovar_tokens(session: Session, refresh_token: str) -> dict:
 
     if resultado.rowcount != 1:
         session.rollback()
-        # Após o rollback, a auditoria precisa de uma sessão própria.
+        # Uso simultâneo do mesmo token também é tratado como reuso: a sessão
+        # inteira é revogada, e a auditoria vai na mesma transação.
+        revogar_sessao(session, sessao_id)
         registrar_auditoria(
             username, "REFRESH", "autenticacao", "negado",
-            detalhes="Refresh token usado simultaneamente ou inválido",
+            detalhes="Refresh token usado simultaneamente ou inválido; sessão revogada",
+            session=session,
         )
+        session.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token já utilizado ou inválido",
