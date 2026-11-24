@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlmodel
+pwdlib[argon2]
+pyjwt
+python-multipart
+streamlit
+requests
+pandas
