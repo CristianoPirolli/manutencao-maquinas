@@ -133,7 +133,7 @@ RFC 6819 / OAuth 2.0 Security BCP). O usuário legítimo precisa entrar de novo.
 
 | Decisão | Motivo |
 |---|---|
-| `lifespan` em vez de inicializar o banco no import | O app pode ser importado (ex.: testes) sem efeitos colaterais |
+| `lifespan` em vez de inicializar o banco no import | O app pode ser importado sem efeitos colaterais; o banco só é criado quando o servidor sobe |
 | Sessão de banco por requisição (`SessionDep`) | Ciclo de vida explícito e fechamento garantido |
 | Auditoria na mesma transação da operação | O log só existe se a operação foi efetivada |
 | Somas de custo em `Decimal` no Python | O SQLite converte `NUMERIC` em ponto flutuante |

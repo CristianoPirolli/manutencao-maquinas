@@ -26,10 +26,9 @@ industriais**.
 4. [Instalação](#-instalação)
 5. [Execução](#-execução)
 6. [Usando o sistema](#-usando-o-sistema)
-7. [Testes automatizados](#-testes-automatizados)
-8. [Configuração](#%EF%B8%8F-configuração)
-9. [Solução de problemas](#-solução-de-problemas)
-10. [Documentação complementar](#-documentação-complementar)
+7. [Configuração](#%EF%B8%8F-configuração)
+8. [Solução de problemas](#-solução-de-problemas)
+9. [Documentação complementar](#-documentação-complementar)
 
 ---
 
@@ -160,15 +159,10 @@ manutencao/
 │       ├── manutencoes/          # Indicadores, busca, tabela, edição e cadastro
 │       └── auditoria/            # Tabela de auditoria
 │
-├── tests/                        # Testes automatizados (pytest)
-│   ├── backend/                  # Testes de API com TestClient
-│   └── frontend/                 # Testes das funções puras
 ├── docs/
 │   ├── ARQUITETURA.md            # Decisões de arquitetura e fluxos
 │   └── API.md                    # Referência dos endpoints
-├── requirements.txt              # Dependências de execução
-├── requirements-dev.txt          # Dependências de testes
-└── pyproject.toml                # Metadados e configuração do pytest
+└── requirements.txt              # Dependências do projeto
 ```
 
 ---
@@ -272,22 +266,6 @@ Novos usuários podem ser criados pela própria tela de login (perfil comum).
 | Validade do access token (JWT) | 15 minutos — renovado automaticamente |
 | Validade do refresh token | 7 dias |
 | Encerramento por inatividade | 30 minutos |
-
----
-
-## 🧪 Testes automatizados
-
-```bash
-pip install -r requirements-dev.txt
-pytest
-```
-
-A suíte (65 testes) usa um banco SQLite temporário e cobre:
-
-- login, scopes, refresh com rotação e proteção contra reuso, logout e timeout de sessão;
-- cadastro de usuários e restrições do perfil comum;
-- CRUD, filtros de busca, indicadores, validações e auditoria de manutenções;
-- funções puras do frontend (formatação, validação de formulário e de payloads).
 
 ---
 
