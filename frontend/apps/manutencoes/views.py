@@ -10,6 +10,7 @@ from html import escape
 import pandas as pd
 import streamlit as st
 
+from frontend.apps.maquinas.views import listar_maquinas, rotulo_maquina
 from frontend.apps.manutencoes import graficos
 from frontend.apps.manutencoes.analise import (
     frases_destaque,
@@ -170,9 +171,14 @@ def _filtros() -> dict[str, str]:
     """Filtros de busca; devolve os parâmetros de ``GET /manutencoes/busca``."""
     col_maquina, col_tipo, col_horas = st.columns([2.2, 2, 1.1], vertical_alignment="bottom")
 
+    maquinas = listar_maquinas() or []
+    rotulos = {m["id"]: rotulo_maquina(m) for m in maquinas}
+
     with col_maquina:
-        maquina = st.text_input(
-            "Máquina", placeholder="Buscar pelo nome da máquina", on_change=registrar_atividade
+        maquina_id = st.selectbox(
+            "Máquina", [None, *rotulos],
+            format_func=lambda i: "Todas as máquinas" if i is None else rotulos[i],
+            on_change=registrar_atividade, key="filtro_maquina",
         )
     with col_tipo:
         tipo = st.pills(
@@ -185,8 +191,8 @@ def _filtros() -> dict[str, str]:
         )
 
     params: dict[str, str] = {}
-    if maquina.strip():
-        params["maquina"] = maquina.strip()
+    if maquina_id is not None:
+        params["maquina_id"] = str(maquina_id)
     if tipo:
         params["tipo"] = tipo
     if min_horas > 0:
@@ -263,18 +269,24 @@ def renderizar_registros() -> None:
 # --------------------------------------------------------------------------- #
 
 
-def _campos_formulario(atual: dict | None = None) -> tuple:
+def _campos_formulario(maquinas: list[dict], atual: dict | None = None) -> tuple:
     """Desenha os campos de manutenção dentro de um ``st.form``.
 
+    :param maquinas: máquinas cadastradas, para a lista suspensa.
     :param atual: valores atuais (edição) ou ``None`` (novo registro).
-    :returns: ``(maquina, tipo, data, custo, horas)`` informados.
+    :returns: ``(maquina_id, tipo, data, custo, horas)`` informados.
     """
     atual = atual or {}
     tipo_atual = atual.get("tipo", "corretiva")
 
-    maquina = st.text_input(
-        "Máquina", value=atual.get("maquina", ""), max_chars=100,
-        placeholder="Ex.: Bobinadeira 01",
+    rotulos = {m["id"]: rotulo_maquina(m) for m in maquinas}
+    ids = list(rotulos)
+    id_atual = atual.get("maquina_id")
+    maquina_id = st.selectbox(
+        "Máquina", ids,
+        index=ids.index(id_atual) if id_atual in ids else None,
+        format_func=rotulos.get,
+        placeholder="Escolha ou digite para buscar",
     )
     tipo = st.segmented_control(
         "Tipo de manutenção", TIPOS_MANUTENCAO, default=tipo_atual,
@@ -297,18 +309,30 @@ def _campos_formulario(atual: dict | None = None) -> tuple:
             "Horas paradas", min_value=0.0, value=float(atual.get("horas", 0.0)),
             step=0.5, format="%.1f",
         )
-    return maquina, tipo, data_manut, custo, horas
+    return maquina_id, tipo, data_manut, custo, horas
 
 
-def _enviar(metodo: str, caminho: str, campos: tuple, *, status_esperado: int, sucesso: str) -> None:
-    """Valida, envia ``POST``/``PUT`` e, se der certo, fecha a janela com aviso."""
-    maquina, tipo, data_manut, custo, horas = campos
+def _maquinas_para_formulario() -> list[dict] | None:
+    """Máquinas da lista suspensa; orienta o usuário se não houver nenhuma."""
+    maquinas = listar_maquinas()
+    if maquinas is None:
+        return None
+    if not maquinas:
+        st.info(
+            "Nenhuma máquina cadastrada ainda. Cadastre a máquina na aba Máquinas "
+            "e depois registre a manutenção.",
+            icon=":material/precision_manufacturing:",
+        )
+        return None
+    return maquinas
 
-    if not tipo:
-        st.error("Escolha o tipo de manutenção.")
-        return
 
-    dados, erro = validar_formulario(maquina, tipo, data_manut, custo, horas)
+def _enviar(metodo: str, caminho: str, campos: tuple, *, status_esperado: int, acao: str) -> None:
+    """Valida, envia ``POST``/``PUT`` e, se der certo, fecha a janela com aviso.
+
+    :param acao: particípio usado no aviso de sucesso (ex.: "registrada").
+    """
+    dados, erro = validar_formulario(*campos)
     if erro:
         st.error(erro)
         return
@@ -328,25 +352,25 @@ def _enviar(metodo: str, caminho: str, campos: tuple, *, status_esperado: int, s
         st.error("A API confirmou a operação, mas devolveu a manutenção incompleta.")
         return
 
-    concluir_operacao(sucesso)
+    concluir_operacao(f"Manutenção de {resultado['manutencao']['maquina']} {acao}.")
 
 
 @st.dialog("Registrar manutenção", width="large")
 def _dialogo_nova_manutencao() -> None:
     """Janela de cadastro de uma nova manutenção."""
+    maquinas = _maquinas_para_formulario()
+    if maquinas is None:
+        return
+
     with st.form("form_nova_manutencao", border=False):
-        campos = _campos_formulario()
+        campos = _campos_formulario(maquinas)
         registrar = st.form_submit_button(
             "Registrar manutenção", type="primary", icon=":material/add:", width="stretch"
         )
 
     if registrar:
         registrar_atividade()
-        _enviar(
-            "POST", "/manutencoes", campos,
-            status_esperado=201,
-            sucesso=f"Manutenção de {campos[0].strip()} registrada.",
-        )
+        _enviar("POST", "/manutencoes", campos, status_esperado=201, acao="registrada")
 
 
 def _carregar_para_edicao(id_manutencao: int) -> dict | None:
@@ -397,12 +421,15 @@ def _dialogo_edicao(id_manutencao: int) -> None:
     atual = _carregar_para_edicao(id_manutencao)
     if atual is None:
         return
+    maquinas = _maquinas_para_formulario()
+    if maquinas is None:
+        return
 
     pode_editar = possui_scope("manutencoes:update")
     st.caption(f"Registro nº {id_manutencao}")
 
     with st.form(f"form_edicao_{id_manutencao}", border=False):
-        campos = _campos_formulario(atual)
+        campos = _campos_formulario(maquinas, atual)
         salvar = st.form_submit_button(
             "Salvar alterações", type="primary", icon=":material/save:",
             width="stretch", disabled=not pode_editar,
@@ -410,11 +437,7 @@ def _dialogo_edicao(id_manutencao: int) -> None:
 
     if salvar:
         registrar_atividade()
-        _enviar(
-            "PUT", f"/manutencoes/{id_manutencao}", campos,
-            status_esperado=200,
-            sucesso=f"Alterações em {campos[0].strip()} salvas.",
-        )
+        _enviar("PUT", f"/manutencoes/{id_manutencao}", campos, status_esperado=200, acao="salva")
 
     if possui_scope("manutencoes:delete"):
         _zona_exclusao(id_manutencao, atual["maquina"])

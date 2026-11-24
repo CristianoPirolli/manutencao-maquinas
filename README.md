@@ -56,9 +56,10 @@ histórico do Git.
 | `GET /vendas` | `GET /manutencoes` |
 | `GET /vendas/qtd-vendas` | `GET /manutencoes/qtd` |
 | `GET /vendas/faturamento` (preço × qtd) | `GET /manutencoes/resumo` (custo total + horas paradas) |
-| `GET /vendas/busca?nome=&min_qtd=` | `GET /manutencoes/busca?maquina=&tipo=&min_horas=` |
+| `GET /vendas/busca?nome=&min_qtd=` | `GET /manutencoes/busca?maquina=&maquina_id=&tipo=&min_horas=` |
 | `GET / PUT / DELETE /vendas/{id}`, `POST /vendas` | `GET / PUT / DELETE /manutencoes/{id}`, `POST /manutencoes` |
-| scopes `vendas:read/create/update/delete` | scopes `manutencoes:read/create/update/delete` |
+| — (o item da venda era texto livre) | `GET / POST / PUT / DELETE /maquinas` (cadastro de máquinas) |
+| scopes `vendas:read/create/update/delete` | scopes `manutencoes:*` e `maquinas:*` (read/create/update/delete) |
 | banco `vendas.db` | banco `manutencao.db` |
 | `uvicorn backend_fastapi:app` | `uvicorn backend.main:app` |
 | `streamlit run frontend_streamlit.py` | `streamlit run frontend/app.py` |
@@ -67,21 +68,40 @@ histórico do Git.
 
 ## 🗄️ Modelo de dados (MER)
 
-### Tabela principal: `manutencao`
+### Tabelas do domínio
+
+Cada manutenção pertence a uma máquina cadastrada (relação 1:N).
+
+**`maquina`**
 
 | Campo | Tipo | Regra de negócio |
 |---|---|---|
 | `id` | INTEGER | Chave primária |
-| `maquina` | VARCHAR(100) | Obrigatório; não pode conter apenas espaços |
+| `nome` | VARCHAR(100) | Obrigatório e único (sem diferenciar maiúsculas de minúsculas) |
+| `setor` | VARCHAR(60) | Opcional |
+
+**`manutencao`**
+
+| Campo | Tipo | Regra de negócio |
+|---|---|---|
+| `id` | INTEGER | Chave primária |
+| `maquina_id` | INTEGER | Chave estrangeira para `maquina.id`; a máquina precisa existir |
 | `tipo` | VARCHAR | `preventiva`, `corretiva` ou `preditiva` |
 | `data_manutencao` | DATE | Não pode estar no futuro |
 | `custo` | NUMERIC(10,2) | Maior que zero |
 | `horas_paradas` | NUMERIC(6,1) | Zero ou mais |
 
-### Tabelas de suporte (iguais à versão 9 do roteiro)
+Uma máquina com manutenções registradas não pode ser excluída, apenas
+renomeada — assim nenhum registro fica sem máquina.
+
+### Diagrama completo
+
+As tabelas `usuario`, `refreshtoken` e `logauditoria` são as mesmas da versão 9
+do roteiro.
 
 ```mermaid
 erDiagram
+    MAQUINA ||--o{ MANUTENCAO : "recebe"
     USUARIO ||--o{ REFRESHTOKEN : "possui sessões"
     USUARIO {
         int id PK
@@ -110,9 +130,14 @@ erDiagram
         string resultado
         string detalhes
     }
+    MAQUINA {
+        int id PK
+        string nome UK
+        string setor
+    }
     MANUTENCAO {
         int id PK
-        string maquina
+        int maquina_id FK
         string tipo
         date data_manutencao
         decimal custo
@@ -142,6 +167,7 @@ manutencao/
 │   └── apps/                     # Módulos de domínio
 │       ├── autenticacao/         # /token, /refresh, /logout + dependência de auth
 │       ├── usuarios/             # /usuarios, /me
+│       ├── maquinas/             # CRUD /maquinas
 │       ├── manutencoes/          # CRUD /manutencoes
 │       └── auditoria/            # /auditoria
 │           # Cada app: models.py · schemas.py · service.py · router.py
@@ -156,6 +182,7 @@ manutencao/
 │   │   └── estilo.py             # Identidade visual (CSS complementar ao tema)
 │   └── apps/                     # Telas por domínio
 │       ├── autenticacao/         # Tela de acesso, perfil e barra lateral
+│       ├── maquinas/             # Cadastro de máquinas e lista suspensa
 │       ├── manutencoes/          # Visão geral, registros, gráficos e janelas modais
 │       └── auditoria/            # Aba de auditoria
 │
@@ -245,6 +272,8 @@ Novos usuários podem ser criados pela própria tela de login (perfil comum).
 
 | Ação | Scope | Admin | Usuário comum |
 |---|---|:---:|:---:|
+| Consultar máquinas | `maquinas:read` | ✅ | ✅ |
+| Cadastrar, editar e excluir máquinas | `maquinas:create/update/delete` | ✅ | ❌ |
 | Consultar manutenções e indicadores | `manutencoes:read` | ✅ | ✅ |
 | Registrar manutenção | `manutencoes:create` | ✅ | ✅ |
 | Alterar manutenção | `manutencoes:update` | ✅ | ✅ |
@@ -264,7 +293,11 @@ advertência amarela, e cada tipo de manutenção com sua cor —
   os gráficos de horas paradas por máquina e de custo por mês.
 - **Registros:** busca por máquina, tipo e parada mínima; clique em uma linha
   para abrir a janela de edição. A exclusão (admin) exige confirmação.
-- **Registrar manutenção:** botão no cabeçalho que abre o formulário em uma janela.
+- **Máquinas:** lista das máquinas com o total de manutenções de cada uma. O
+  admin cadastra, renomeia e exclui (só máquinas sem histórico).
+- **Registrar manutenção:** botão no cabeçalho que abre o formulário em uma
+  janela; a máquina é escolhida numa lista suspensa com busca, alimentada pelo
+  cadastro de máquinas.
 - **Auditoria** (admin): operações recentes, filtráveis por resultado.
 - **Barra lateral:** status da API, usuário, contador da sessão e permissões.
 

@@ -15,6 +15,10 @@ _AVISO_EXPIRACAO_SEGUNDOS = 5 * 60
 
 #: Descrição legível de cada scope, exibida na lista de permissões.
 _DESCRICAO_SCOPES = {
+    "maquinas:read": "Consultar máquinas",
+    "maquinas:create": "Cadastrar máquinas",
+    "maquinas:update": "Editar máquinas",
+    "maquinas:delete": "Excluir máquinas",
     "manutencoes:read": "Consultar manutenções",
     "manutencoes:create": "Registrar manutenções",
     "manutencoes:update": "Editar manutenções",

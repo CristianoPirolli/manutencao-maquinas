@@ -14,7 +14,7 @@ import pandas as pd
 from frontend.core.config import TIPOS_MANUTENCAO
 from frontend.core.formatadores import valor_decimal
 
-COLUNAS = ["id", "data", "maquina", "tipo", "custo", "horas"]
+COLUNAS = ["id", "data", "maquina_id", "maquina", "tipo", "custo", "horas"]
 
 
 def montar_dataframe(dados: dict) -> pd.DataFrame:
@@ -37,6 +37,7 @@ def montar_dataframe(dados: dict) -> pd.DataFrame:
         linhas.append({
             "id": int(id_manutencao),
             "data": date.fromisoformat(str(item["data_manutencao"])),
+            "maquina_id": int(item["maquina_id"]),
             "maquina": str(item["maquina"]),
             "tipo": tipo,
             "custo": float(custo),

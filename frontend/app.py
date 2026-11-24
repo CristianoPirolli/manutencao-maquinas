@@ -30,6 +30,7 @@ from frontend.apps.autenticacao.views import (  # noqa: E402
     renderizar_tela_acesso,
     sincronizar_perfil,
 )
+from frontend.apps.maquinas.views import renderizar_maquinas  # noqa: E402
 from frontend.apps.manutencoes.views import (  # noqa: E402
     renderizar_cabecalho,
     renderizar_registros,
@@ -60,18 +61,18 @@ def main() -> None:
     renderizar_usuario(usuario)
     renderizar_cabecalho()
 
-    nomes_abas = ["Visão geral", "Registros"]
+    # Cada aba: (rótulo, função que a desenha). Auditoria só para quem tem o scope.
+    abas = [
+        ("Visão geral", renderizar_visao_geral),
+        ("Registros", renderizar_registros),
+        ("Máquinas", renderizar_maquinas),
+    ]
     if pode_ver_auditoria():
-        nomes_abas.append("Auditoria")
-    abas = st.tabs(nomes_abas)
+        abas.append(("Auditoria", renderizar_auditoria))
 
-    with abas[0]:
-        renderizar_visao_geral()
-    with abas[1]:
-        renderizar_registros()
-    if len(abas) > 2:
-        with abas[2]:
-            renderizar_auditoria()
+    for container, (_, renderizar) in zip(st.tabs([rotulo for rotulo, _ in abas]), abas):
+        with container:
+            renderizar()
 
 
 main()

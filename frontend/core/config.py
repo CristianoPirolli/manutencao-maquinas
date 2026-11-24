@@ -31,8 +31,11 @@ CORES_TIPO: dict[str, str] = {
 
 #: Campos obrigatórios de uma manutenção completa retornada pela API.
 CAMPOS_MANUTENCAO: frozenset[str] = frozenset(
-    {"id", "maquina", "tipo", "data_manutencao", "custo", "horas_paradas"}
+    {"id", "maquina_id", "maquina", "tipo", "data_manutencao", "custo", "horas_paradas"}
 )
 
 #: Prefixo da chave do ``st.dataframe`` de registros.
 CHAVE_TABELA: str = "tabela_manutencoes"
+
+#: Prefixo da chave do ``st.dataframe`` de máquinas.
+CHAVE_TABELA_MAQUINAS: str = "tabela_maquinas"
