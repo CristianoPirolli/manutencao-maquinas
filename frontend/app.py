@@ -1,6 +1,7 @@
 """Ponto de entrada do frontend Streamlit.
 
-Execução (a partir da raiz do repositório)::
+Execução (a partir da raiz do repositório, para que o tema em
+``.streamlit/config.toml`` seja aplicado)::
 
     streamlit run frontend/app.py
 
@@ -20,7 +21,7 @@ if str(_RAIZ) not in sys.path:
 
 import streamlit as st  # noqa: E402
 
-from frontend.apps.auditoria.views import renderizar_auditoria  # noqa: E402
+from frontend.apps.auditoria.views import pode_ver_auditoria, renderizar_auditoria  # noqa: E402
 from frontend.apps.autenticacao.componentes import (  # noqa: E402
     renderizar_status_api,
     renderizar_usuario,
@@ -30,11 +31,9 @@ from frontend.apps.autenticacao.views import (  # noqa: E402
     sincronizar_perfil,
 )
 from frontend.apps.manutencoes.views import (  # noqa: E402
-    renderizar_aviso_removida,
-    renderizar_cadastro,
-    renderizar_edicao,
-    renderizar_indicadores,
-    renderizar_listagem,
+    renderizar_cabecalho,
+    renderizar_registros,
+    renderizar_visao_geral,
 )
 from frontend.core.estado import inicializar_estado, usuario_logado  # noqa: E402
 from frontend.core.estilo import aplicar_estilo  # noqa: E402
@@ -42,7 +41,11 @@ from frontend.core.estilo import aplicar_estilo  # noqa: E402
 
 def main() -> None:
     """Fluxo de uma execução (rerun) da página."""
-    st.set_page_config(page_title="Manutenção de Máquinas", layout="wide")
+    st.set_page_config(
+        page_title="Controle de manutenção",
+        page_icon=":material/precision_manufacturing:",
+        layout="wide",
+    )
     aplicar_estilo()
     inicializar_estado()
     renderizar_status_api()
@@ -54,15 +57,21 @@ def main() -> None:
 
     # Área autenticada.
     usuario = sincronizar_perfil()
-
-    st.title("🛠️ Painel de Manutenção de Máquinas")
     renderizar_usuario(usuario)
-    renderizar_indicadores()
-    renderizar_listagem()
-    renderizar_edicao()
-    renderizar_aviso_removida()
-    renderizar_cadastro()
-    renderizar_auditoria()
+    renderizar_cabecalho()
+
+    nomes_abas = ["Visão geral", "Registros"]
+    if pode_ver_auditoria():
+        nomes_abas.append("Auditoria")
+    abas = st.tabs(nomes_abas)
+
+    with abas[0]:
+        renderizar_visao_geral()
+    with abas[1]:
+        renderizar_registros()
+    if len(abas) > 2:
+        with abas[2]:
+            renderizar_auditoria()
 
 
 main()

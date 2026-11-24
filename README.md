@@ -153,12 +153,13 @@ manutencao/
 │   │   ├── api_client.py         # HTTP com renovação automática de token
 │   │   ├── estado.py             # Gerenciamento do st.session_state
 │   │   ├── formatadores.py       # Moeda, horas e tempo (funções puras)
-│   │   └── estilo.py             # CSS global
+│   │   └── estilo.py             # Identidade visual (CSS complementar ao tema)
 │   └── apps/                     # Telas por domínio
-│       ├── autenticacao/         # Login, cadastro, perfil e barra lateral
-│       ├── manutencoes/          # Indicadores, busca, tabela, edição e cadastro
-│       └── auditoria/            # Tabela de auditoria
+│       ├── autenticacao/         # Tela de acesso, perfil e barra lateral
+│       ├── manutencoes/          # Visão geral, registros, gráficos e janelas modais
+│       └── auditoria/            # Aba de auditoria
 │
+├── .streamlit/config.toml        # Tema: cores, fontes e barra lateral
 ├── docs/
 │   ├── ARQUITETURA.md            # Decisões de arquitetura e fluxos
 │   └── API.md                    # Referência dos endpoints
@@ -252,12 +253,23 @@ Novos usuários podem ser criados pela própria tela de login (perfil comum).
 
 ### Funcionalidades da interface
 
-- **Barra lateral:** status da API, usuário logado, permissões, contador de
-  sessão e indicadores (custo total, horas paradas, total de manutenções).
-- **Busca:** filtro por nome da máquina, tipo e horas paradas mínimas.
-- **Tabela:** clique em uma linha para carregar o formulário de edição/exclusão.
-- **Nova manutenção:** formulário com seleção de tipo e data.
-- **Auditoria** (admin): últimas operações registradas no sistema.
+A identidade visual segue o código de cores de segurança industrial: faixa de
+advertência amarela, e cada tipo de manutenção com sua cor —
+**preventiva** em azul (ação planejada), **corretiva** em vermelho (falha) e
+**preditiva** em verde (condição monitorada).
+
+- **Visão geral:** uma frase gerada a partir dos dados aponta a máquina com mais
+  horas paradas e o peso das corretivas no custo; abaixo, os indicadores (custo
+  acumulado, horas paradas, intervenções e custo médio), a proporção por tipo e
+  os gráficos de horas paradas por máquina e de custo por mês.
+- **Registros:** busca por máquina, tipo e parada mínima; clique em uma linha
+  para abrir a janela de edição. A exclusão (admin) exige confirmação.
+- **Registrar manutenção:** botão no cabeçalho que abre o formulário em uma janela.
+- **Auditoria** (admin): operações recentes, filtráveis por resultado.
+- **Barra lateral:** status da API, usuário, contador da sessão e permissões.
+
+> O tema é lido de `.streamlit/config.toml`; por isso, rode o
+> `streamlit run frontend/app.py` a partir da raiz do projeto.
 
 ### Regras de sessão
 

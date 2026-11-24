@@ -21,10 +21,18 @@ SESSION_IDLE_SECONDS: int = 30 * 60
 #: Tipos válidos de manutenção (devem coincidir com o backend).
 TIPOS_MANUTENCAO: tuple[str, ...] = ("preventiva", "corretiva", "preditiva")
 
+#: Cor de cada tipo, seguindo o código de cores de segurança industrial:
+#: azul = ação planejada, vermelho = falha, verde = condição monitorada.
+CORES_TIPO: dict[str, str] = {
+    "preventiva": "#2F6FB2",
+    "corretiva": "#C8332B",
+    "preditiva": "#2E8B57",
+}
+
 #: Campos obrigatórios de uma manutenção completa retornada pela API.
 CAMPOS_MANUTENCAO: frozenset[str] = frozenset(
     {"id", "maquina", "tipo", "data_manutencao", "custo", "horas_paradas"}
 )
 
-#: Prefixo da chave do ``st.dataframe`` principal.
-CHAVE_TABELA: str = "tabela_manutencoes_principal"
+#: Prefixo da chave do ``st.dataframe`` de registros.
+CHAVE_TABELA: str = "tabela_manutencoes"

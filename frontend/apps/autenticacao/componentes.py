@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from html import escape
 
 import streamlit as st
 
@@ -12,36 +13,49 @@ from frontend.core.formatadores import formatar_tempo
 
 _AVISO_EXPIRACAO_SEGUNDOS = 5 * 60
 
+#: Descrição legível de cada scope, exibida na lista de permissões.
+_DESCRICAO_SCOPES = {
+    "manutencoes:read": "Consultar manutenções",
+    "manutencoes:create": "Registrar manutenções",
+    "manutencoes:update": "Editar manutenções",
+    "manutencoes:delete": "Excluir manutenções",
+    "auditoria:read": "Consultar auditoria",
+}
+
 
 def renderizar_status_api() -> None:
-    """Indicador visual de disponibilidade da API."""
+    """Indicador discreto de disponibilidade da API na barra lateral."""
     if api_online():
-        st.sidebar.success("🟢 API online")
+        cor, texto = "#2E8B57", "API conectada"
     else:
-        st.sidebar.error("🔴 API indisponível")
+        cor, texto = "#C8332B", "API indisponível. Verifique se o backend está rodando."
+
+    st.sidebar.markdown(
+        f'<p class="status-api"><i style="background:{cor}"></i>{texto}</p>',
+        unsafe_allow_html=True,
+    )
 
 
 def renderizar_usuario(usuario: dict) -> None:
-    """Mostra login, perfil, permissões, contador de sessão e botão Sair."""
-    st.sidebar.header("👤 Usuário")
-    st.sidebar.write(f"**Login:** {usuario.get('username', '—')}")
-    st.sidebar.write(f"**Perfil:** {usuario.get('role', '—')}")
-
-    if usuario.get("role") == "admin":
-        st.sidebar.success("Administrador")
-    else:
-        st.sidebar.info("Usuário comum")
-
-    st.sidebar.markdown("**Permissões:**")
-    for scope in usuario.get("scopes", []):
-        st.sidebar.write(f"✓ {scope}")
+    """Nome, perfil, contador de sessão, permissões e botão Sair."""
+    perfil = "Administrador" if usuario.get("role") == "admin" else "Usuário comum"
 
     with st.sidebar:
+        st.markdown(
+            f'<p class="usuario-nome">{escape(str(usuario.get("username", "—")))}</p>'
+            f'<p class="usuario-perfil">{perfil}</p>',
+            unsafe_allow_html=True,
+        )
+
         painel_expiracao()
 
-    if st.sidebar.button("🚪 Sair", width="stretch"):
-        logout()
-        st.rerun()
+        with st.expander("Permissões desta sessão"):
+            for scope in usuario.get("scopes", []):
+                st.markdown(f":material/check: {_DESCRICAO_SCOPES.get(scope, scope)}")
+
+        if st.button("Sair", icon=":material/logout:", width="stretch"):
+            logout()
+            st.rerun()
 
 
 @st.fragment(run_every="10s")
@@ -59,31 +73,25 @@ def painel_expiracao() -> None:
         return
 
     agora = datetime.now(timezone.utc)
-    restante_inatividade = (horario_expiracao - agora).total_seconds()
-
+    restante = (horario_expiracao - agora).total_seconds()
     access_expira_em = st.session_state.get("access_expira_em")
-    refresh_expira_em = st.session_state.get("refresh_expira_em")
     restante_access = (access_expira_em - agora).total_seconds() if access_expira_em else 0
-    restante_refresh = (refresh_expira_em - agora).total_seconds() if refresh_expira_em else 0
 
-    st.markdown("### ⏳ Sessão")
-    st.metric("Expira por inatividade em", formatar_tempo(restante_inatividade))
+    st.caption("Sessão encerra por inatividade em")
+    st.markdown(
+        f'<div class="sessao-tempo">{formatar_tempo(restante)}</div>', unsafe_allow_html=True
+    )
+    st.caption(
+        f"Token de acesso renova sozinho em {formatar_tempo(restante_access)}."
+        if restante_access > 0
+        else "Token de acesso será renovado na próxima ação."
+    )
 
-    if restante_access > 0:
-        st.caption(
-            f"🔑 Access token expira em {formatar_tempo(restante_access)} — "
-            "renovação automática na próxima chamada protegida."
-        )
-    else:
-        st.caption("🔑 Access token expirado. Será renovado na próxima chamada protegida.")
+    if 0 < restante <= _AVISO_EXPIRACAO_SEGUNDOS:
+        st.warning("Menos de 5 minutos de sessão. Interaja com o painel para continuar.")
 
-    st.caption(f"🔄 Refresh token: {max(0, restante_refresh / 86400):.1f} dias restantes.")
-
-    if 0 < restante_inatividade <= _AVISO_EXPIRACAO_SEGUNDOS:
-        st.warning("A sessão será encerrada em menos de 5 minutos.")
-
-    if restante_inatividade <= 0:
-        st.error("🔒 Sessão encerrada por inatividade. Redirecionando...")
+    if restante <= 0:
+        st.error("Sessão encerrada por inatividade. Entre novamente.")
         time.sleep(2)
         logout()
         st.rerun()

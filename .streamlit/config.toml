@@ -1,0 +1,29 @@
+# Tema visual do frontend (lido pelo Streamlit a partir da raiz do projeto).
+#
+# Paleta inspirada na sinalização de segurança industrial:
+#   tinta (azul-petróleo) para texto e ações, aço claro como fundo e as cores
+#   de segurança reservadas para significado (tipos de manutenção e alertas).
+
+[theme]
+base = "light"
+primaryColor = "#10324A"
+backgroundColor = "#E8ECEF"
+secondaryBackgroundColor = "#F7F9FA"
+textColor = "#10324A"
+borderColor = "#C9D2D9"
+baseRadius = "0.25rem"
+showWidgetBorder = true
+font = "Barlow:https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap"
+headingFont = "Barlow Condensed:https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&display=swap"
+
+[theme.sidebar]
+backgroundColor = "#10324A"
+secondaryBackgroundColor = "#1B4460"
+textColor = "#E8ECEF"
+borderColor = "#2C5876"
+
+[client]
+toolbarMode = "minimal"
+
+[browser]
+gatherUsageStats = false

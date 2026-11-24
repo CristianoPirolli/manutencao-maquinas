@@ -12,64 +12,44 @@ import streamlit as st
 
 from frontend.core.config import SESSION_IDLE_SECONDS
 
-#: Chaves dos widgets do formulário de edição.
-_CHAVES_EDICAO = ("edit_maquina", "edit_tipo", "edit_data", "edit_custo", "edit_horas")
-
 #: Estado inicial de cada chave controlada pelo app.
 _ESTADO_INICIAL = {
     "token": None,
     "refresh_token": None,
     "usuario": None,
     "sessao_id": None,
-    "id_selecionado": None,
-    "id_carregado_formulario": None,
-    "limpar_edicao_pendente": False,
-    "geracao_tabela": 0,
-    "chave_tabela_anterior": None,
     "access_expira_em": None,
     "refresh_expira_em": None,
     "horario_expiracao": None,
     "session_idle_seconds": SESSION_IDLE_SECONDS,
+    # Muda a ``key`` da tabela de registros para descartar seleções antigas.
+    "geracao_tabela": 0,
+    # Id da manutenção cuja janela de edição deve abrir neste rerun.
+    "editar_id": None,
+    # Mensagem a exibir como toast no próximo rerun (ex.: após salvar).
+    "aviso_pendente": None,
 }
 
 
 def inicializar_estado() -> None:
-    """Cria as chaves ausentes e aplica limpezas agendadas no rerun anterior.
-
-    Widgets com ``key`` não podem ter o valor alterado depois de criados no
-    mesmo rerun; por isso a limpeza do formulário é *agendada* e executada
-    aqui, antes de qualquer widget ser desenhado.
-    """
+    """Cria as chaves ausentes e exibe o aviso deixado pelo rerun anterior."""
     for chave, valor in _ESTADO_INICIAL.items():
         st.session_state.setdefault(chave, valor)
 
-    if st.session_state.limpar_edicao_pendente:
-        limpar_edicao()
-        st.session_state.limpar_edicao_pendente = False
+    aviso = st.session_state.aviso_pendente
+    if aviso:
+        st.toast(aviso, icon=":material/check_circle:")
+        st.session_state.aviso_pendente = None
 
 
-# --------------------------------------------------------------------------- #
-# Seleção / edição de manutenções
-# --------------------------------------------------------------------------- #
+def concluir_operacao(mensagem: str) -> None:
+    """Agenda o aviso de sucesso, renova a tabela e recarrega a página.
 
-
-def limpar_edicao() -> None:
-    """Remove os valores do formulário de edição."""
-    st.session_state.id_carregado_formulario = None
-    for chave in _CHAVES_EDICAO:
-        st.session_state.pop(chave, None)
-
-
-def limpar_selecao() -> None:
-    """Desmarca a manutenção selecionada e limpa o formulário."""
-    st.session_state.id_selecionado = None
-    limpar_edicao()
-
-
-def agendar_limpeza_edicao() -> None:
-    """Desmarca a seleção e limpa os widgets no início do próximo rerun."""
-    st.session_state.id_selecionado = None
-    st.session_state.limpar_edicao_pendente = True
+    O ``st.rerun`` completo também fecha a janela modal que originou a ação.
+    """
+    st.session_state.aviso_pendente = mensagem
+    st.session_state.geracao_tabela += 1
+    st.rerun()
 
 
 # --------------------------------------------------------------------------- #
@@ -116,14 +96,9 @@ def salvar_tokens(dados: dict) -> None:
 
 def limpar_sessao() -> None:
     """Descarta tokens e dados do usuário (logout local)."""
-    st.session_state.token = None
-    st.session_state.refresh_token = None
-    st.session_state.usuario = None
-    st.session_state.sessao_id = None
-    st.session_state.id_selecionado = None
-    st.session_state.access_expira_em = None
-    st.session_state.refresh_expira_em = None
-    st.session_state.horario_expiracao = None
+    for chave in (
+        "token", "refresh_token", "usuario", "sessao_id",
+        "access_expira_em", "refresh_expira_em", "horario_expiracao", "editar_id",
+    ):
+        st.session_state[chave] = None
     st.session_state.session_idle_seconds = SESSION_IDLE_SECONDS
-    st.session_state.id_carregado_formulario = None
-    st.session_state.limpar_edicao_pendente = True
