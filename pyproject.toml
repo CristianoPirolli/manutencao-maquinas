@@ -1,0 +1,25 @@
+[project]
+name = "manutencao-maquinas"
+version = "9.0.0"
+description = "Estudo de caso de sistema distribuído: API FastAPI + frontend Streamlit para gestão de manutenções de máquinas."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    { name = "Cristiano Pirolli" },
+    { name = "Ryan Lirio" },
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+filterwarnings = [
+    # Aviso interno do Starlette sobre o TestClient; não afeta a aplicação.
+    "ignore:Using .httpx. with .starlette.testclient.",
+    # Os testes usam propositalmente a chave JWT de desenvolvimento.
+    "ignore:JWT_SECRET não definido:RuntimeWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
