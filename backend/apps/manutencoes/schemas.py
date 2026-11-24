@@ -1,6 +1,8 @@
 """Contratos de saída do app de manutenções.
 
-A entrada (``POST``/``PUT``) usa :class:`backend.apps.manutencoes.models.ManutencaoBase`.
+A entrada (``POST``/``PUT``) usa :class:`backend.apps.manutencoes.models.ManutencaoBase`,
+que recebe ``maquina_id``. As saídas trazem também o nome da máquina, para que
+os clientes não precisem de uma segunda consulta.
 """
 
 from datetime import date
@@ -12,6 +14,7 @@ from sqlmodel import SQLModel
 class ManutencaoBuscaItem(SQLModel):
     """Item das listagens (o ``id`` é a chave do dicionário de resposta)."""
 
+    maquina_id: int
     maquina: str
     tipo: str
     data_manutencao: date

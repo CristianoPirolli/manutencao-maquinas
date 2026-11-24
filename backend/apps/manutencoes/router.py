@@ -56,13 +56,16 @@ def resumo_custos(
 def buscar_manutencoes(
     session: SessionDep,
     maquina: str | None = Query(None, description="Parte do nome da máquina"),
+    maquina_id: int | None = Query(None, gt=0, description="Id exato da máquina"),
     tipo: TipoManutencao | None = Query(None, description="preventiva, corretiva ou preditiva"),
     min_horas: Decimal | None = Query(None, ge=0, description="Mínimo de horas paradas"),
     _usuario: UsuarioAtual = Security(obter_usuario_atual, scopes=["manutencoes:read"]),
 ):
     """Busca manutenções combinando os filtros informados."""
-    manutencoes = service.buscar(session, maquina=maquina, tipo=tipo, min_horas=min_horas)
-    return service.indexar_por_id(manutencoes)
+    linhas = service.buscar(
+        session, maquina=maquina, maquina_id=maquina_id, tipo=tipo, min_horas=min_horas
+    )
+    return service.indexar_por_id(linhas)
 
 
 @router.get("/{id_manutencao}", response_model=ManutencaoSaida)
@@ -72,7 +75,8 @@ def obter_manutencao(
     _usuario: UsuarioAtual = Security(obter_usuario_atual, scopes=["manutencoes:read"]),
 ):
     """Retorna uma manutenção pelo ``id`` (404 se não existir)."""
-    return service.para_saida(service.obter(session, id_manutencao))
+    manutencao, nome_maquina = service.obter(session, id_manutencao)
+    return service.para_saida(manutencao, nome_maquina)
 
 
 @router.post(

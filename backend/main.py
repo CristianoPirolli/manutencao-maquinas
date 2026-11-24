@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.apps.auditoria.router import router as auditoria_router
 from backend.apps.autenticacao.router import router as autenticacao_router
+from backend.apps.maquinas.router import router as maquinas_router
 from backend.apps.manutencoes.router import router as manutencoes_router
 from backend.apps.usuarios.router import router as usuarios_router
 from backend.core.compat import configurar_event_loop_windows
@@ -54,6 +55,7 @@ def criar_app() -> FastAPI:
 
     aplicacao.include_router(autenticacao_router)
     aplicacao.include_router(usuarios_router)
+    aplicacao.include_router(maquinas_router)
     aplicacao.include_router(manutencoes_router)
     aplicacao.include_router(auditoria_router)
 

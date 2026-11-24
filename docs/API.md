@@ -47,6 +47,25 @@ Resposta de `/token` e `/refresh`:
 | POST | `/usuarios` | — | Cria conta comum: `{"username": "...", "senha": "..."}` (201, 409 se existir) |
 | GET | `/me` | qualquer | Perfil e scopes efetivos da sessão |
 
+## Máquinas
+
+| Método | Rota | Scope | Descrição |
+|---|---|---|---|
+| GET | `/maquinas` | `maquinas:read` | Lista em ordem alfabética, com `total_manutencoes` |
+| GET | `/maquinas/{id}` | `maquinas:read` | Uma máquina (404 se não existir) |
+| POST | `/maquinas` | `maquinas:create` | Cadastra (201; 409 se o nome já existir) |
+| PUT | `/maquinas/{id}` | `maquinas:update` | Altera nome e setor (409 se o nome já existir) |
+| DELETE | `/maquinas/{id}` | `maquinas:delete` | Exclui (409 se houver manutenções registradas) |
+
+Corpo de `POST` / `PUT`: `{"nome": "Prensa hidráulica PH-4", "setor": "Prensagem"}`
+(`setor` é opcional). Resposta de `GET /maquinas`:
+
+```json
+[
+  {"id": 1, "nome": "Bobinadeira 01", "setor": "Acabamento", "total_manutencoes": 2}
+]
+```
+
 ## Manutenções
 
 | Método | Rota | Scope | Descrição |
@@ -54,17 +73,17 @@ Resposta de `/token` e `/refresh`:
 | GET | `/manutencoes` | `manutencoes:read` | Todas, no formato `{id: manutencao}` |
 | GET | `/manutencoes/qtd` | `manutencoes:read` | `{"quantidade_total": 5}` |
 | GET | `/manutencoes/resumo` | `manutencoes:read` | `{"custo_total": "20580.50", "horas_paradas_total": "35.0", "moeda": "R$"}` |
-| GET | `/manutencoes/busca` | `manutencoes:read` | Filtros `maquina`, `tipo`, `min_horas`; mais recentes primeiro |
+| GET | `/manutencoes/busca` | `manutencoes:read` | Filtros `maquina` (trecho do nome), `maquina_id`, `tipo`, `min_horas`; mais recentes primeiro |
 | GET | `/manutencoes/{id}` | `manutencoes:read` | Uma manutenção (404 se não existir) |
-| POST | `/manutencoes` | `manutencoes:create` | Cria (201) |
+| POST | `/manutencoes` | `manutencoes:create` | Cria (201; 422 se a máquina não existir) |
 | PUT | `/manutencoes/{id}` | `manutencoes:update` | Substitui todos os campos |
 | DELETE | `/manutencoes/{id}` | `manutencoes:delete` | Exclui |
 
-Corpo de `POST` / `PUT`:
+Corpo de `POST` / `PUT` (a máquina é informada pelo `id` do cadastro):
 
 ```json
 {
-  "maquina": "Bobinadeira 01",
+  "maquina_id": 1,
   "tipo": "corretiva",
   "data_manutencao": "2026-11-10",
   "custo": "2780.50",
@@ -72,7 +91,9 @@ Corpo de `POST` / `PUT`:
 }
 ```
 
-Valores decimais são trafegados como texto para preservar a precisão.
+As respostas trazem `maquina_id` e também `maquina` (o nome), para o cliente
+não precisar de uma segunda consulta. Valores decimais são trafegados como
+texto para preservar a precisão.
 
 ## Auditoria
 
@@ -88,9 +109,9 @@ Valores decimais são trafegados como texto para preservar a precisão.
 | 400 | Scope solicitado não permitido ao perfil |
 | 401 | Token ausente, inválido ou expirado; sessão encerrada; credenciais inválidas |
 | 403 | Token válido, mas sem o scope exigido pela rota |
-| 404 | Manutenção inexistente |
-| 409 | Nome de usuário já cadastrado |
-| 422 | Dados de entrada inválidos (validação Pydantic) |
+| 404 | Máquina ou manutenção inexistente |
+| 409 | Nome de usuário ou de máquina já cadastrado; máquina com histórico não pode ser excluída |
+| 422 | Dados de entrada inválidos (validação Pydantic) ou máquina informada não cadastrada |
 
 ## Exemplo com `curl`
 

@@ -26,6 +26,10 @@ PERFIL_USUARIO = "usuario"
 
 #: Catálogo de scopes exibido no Swagger e usado para validar os tokens.
 SCOPES: dict[str, str] = {
+    "maquinas:read": "Consultar máquinas",
+    "maquinas:create": "Cadastrar máquinas",
+    "maquinas:update": "Alterar máquinas",
+    "maquinas:delete": "Excluir máquinas",
     "manutencoes:read": "Consultar manutenções",
     "manutencoes:create": "Registrar manutenções",
     "manutencoes:update": "Alterar manutenções",
@@ -33,9 +37,14 @@ SCOPES: dict[str, str] = {
     "auditoria:read": "Consultar registros de auditoria",
 }
 
-#: Scopes do perfil comum: pode consultar, criar e alterar, mas não excluir
-#: nem consultar a auditoria.
-_SCOPES_USUARIO_COMUM = ["manutencoes:read", "manutencoes:create", "manutencoes:update"]
+#: Scopes do perfil comum: consulta as máquinas e registra/altera manutenções,
+#: mas não gerencia o cadastro de máquinas, não exclui e não vê a auditoria.
+_SCOPES_USUARIO_COMUM = [
+    "maquinas:read",
+    "manutencoes:read",
+    "manutencoes:create",
+    "manutencoes:update",
+]
 
 
 def scopes_do_usuario(role: str) -> list[str]:

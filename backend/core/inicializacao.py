@@ -5,8 +5,11 @@ Executado uma vez na subida da API (ver ``lifespan`` em ``backend.main``).
 
 from __future__ import annotations
 
+import logging
+import shutil
 import time
 from datetime import date
+from pathlib import Path
 from decimal import Decimal
 from uuid import uuid4
 
@@ -17,11 +20,14 @@ from sqlmodel import Field, Session, SQLModel, select
 # Sem eles, ``create_all`` não saberia que essas tabelas existem.
 from backend.apps.auditoria.models import LogAuditoria  # noqa: F401
 from backend.apps.autenticacao.models import RefreshToken  # noqa: F401
+from backend.apps.maquinas.models import Maquina
 from backend.apps.manutencoes.models import Manutencao
 from backend.apps.usuarios.models import Usuario
 from backend.core.config import settings
 from backend.core.database import engine
 from backend.core.security import PERFIL_ADMIN, gerar_hash_senha
+
+logger = logging.getLogger("uvicorn.error")
 
 
 class ControleInicializacao(SQLModel, table=True):
@@ -35,7 +41,15 @@ class ControleInicializacao(SQLModel, table=True):
     manutencoes_demo_inseridas: bool = False
 
 
-#: Registros de exemplo inseridos na primeira execução.
+#: Máquinas de exemplo (nome, setor) inseridas na primeira execução.
+MAQUINAS_DEMO: tuple[tuple[str, str], ...] = (
+    ("Bobinadeira 01", "Acabamento"),
+    ("Máquina de papel MP-2", "Fabricação de papel"),
+    ("Caldeira", "Utilidades"),
+    ("Cortadeira CT-3", "Acabamento"),
+)
+
+#: Manutenções de exemplo; ``maquina`` é o nome de uma das máquinas acima.
 MANUTENCOES_DEMO: tuple[dict, ...] = (
     {"maquina": "Bobinadeira 01", "tipo": "preventiva", "data_manutencao": date(2026, 9, 2),
      "custo": Decimal("850.00"), "horas_paradas": Decimal("4.0")},
@@ -58,6 +72,7 @@ def preparar_banco() -> None:
     ainda não existem.
     """
     SQLModel.metadata.create_all(engine)
+    _migrar_maquina_texto_para_tabela()
 
     inspetor = inspect(engine)
     colunas_usuario = {c["name"] for c in inspetor.get_columns("usuario")}
@@ -102,6 +117,87 @@ def preparar_banco() -> None:
             )
 
 
+def _copiar_banco_sqlite(sufixo: str) -> None:
+    """Copia o arquivo SQLite antes de uma migração estrutural.
+
+    Rede de segurança adicional: o driver ``sqlite3`` pode confirmar comandos
+    DDL fora da transação, então o rollback sozinho não garante a reversão.
+    """
+    caminho = engine.url.database
+    if engine.url.get_backend_name() != "sqlite" or not caminho or caminho == ":memory:":
+        return
+
+    origem = Path(caminho)
+    if origem.exists():
+        destino = origem.with_name(f"{origem.stem}.{sufixo}{origem.suffix}")
+        shutil.copy2(origem, destino)
+        logger.warning("Migração do banco: cópia de segurança salva em %s", destino)
+
+
+def _migrar_maquina_texto_para_tabela() -> None:
+    """Converte bancos antigos em que ``manutencao.maquina`` era texto livre.
+
+    Passos, todos na mesma transação (falhou, nada muda):
+
+    1. cria uma máquina para cada nome distinto já usado (ignorando
+       maiúsculas/minúsculas e espaços nas pontas);
+    2. renomeia a tabela antiga e cria a nova a partir do modelo atual;
+    3. copia os registros trocando o nome pelo ``maquina_id``;
+    4. confere a contagem de linhas e apaga a tabela antiga.
+
+    O SQLite não permite remover/alterar colunas ``NOT NULL`` com
+    ``ALTER TABLE``, por isso a tabela é reconstruída.
+    """
+    inspetor = inspect(engine)
+    colunas = {c["name"] for c in inspetor.get_columns("manutencao")}
+    if "maquina_id" in colunas or "maquina" not in colunas:
+        return  # Banco já está no formato novo.
+
+    _copiar_banco_sqlite("pre-maquinas")
+
+    with engine.begin() as conexao:
+        nomes = conexao.exec_driver_sql(
+            "SELECT trim(maquina) FROM manutencao GROUP BY lower(trim(maquina)) "
+            "ORDER BY min(id)"
+        ).scalars().all()
+
+        for nome in nomes:
+            existe = conexao.exec_driver_sql(
+                "SELECT 1 FROM maquina WHERE lower(nome) = lower(?)", (nome,)
+            ).first()
+            if existe is None:
+                conexao.exec_driver_sql("INSERT INTO maquina (nome) VALUES (?)", (nome,))
+
+        total_antes = conexao.exec_driver_sql("SELECT count(*) FROM manutencao").scalar_one()
+
+        conexao.exec_driver_sql("ALTER TABLE manutencao RENAME TO manutencao_antiga")
+        # Índices mantêm o nome ao renomear a tabela; removê-los evita conflito
+        # com os índices criados pela nova tabela.
+        indices = conexao.exec_driver_sql(
+            "SELECT name FROM sqlite_master WHERE type = 'index' "
+            "AND tbl_name = 'manutencao_antiga' AND sql IS NOT NULL"
+        ).scalars().all()
+        for indice in indices:
+            conexao.exec_driver_sql(f'DROP INDEX "{indice}"')
+
+        Manutencao.__table__.create(conexao)
+        conexao.exec_driver_sql(
+            "INSERT INTO manutencao (id, maquina_id, tipo, data_manutencao, custo, horas_paradas) "
+            "SELECT a.id, q.id, a.tipo, a.data_manutencao, a.custo, a.horas_paradas "
+            "FROM manutencao_antiga a "
+            "JOIN maquina q ON lower(q.nome) = lower(trim(a.maquina))"
+        )
+
+        total_depois = conexao.exec_driver_sql("SELECT count(*) FROM manutencao").scalar_one()
+        if total_depois != total_antes:
+            raise RuntimeError(
+                f"Migração de máquinas abortada: {total_antes} registros antes, "
+                f"{total_depois} depois. Nenhuma alteração foi gravada."
+            )
+
+        conexao.exec_driver_sql("DROP TABLE manutencao_antiga")
+
+
 def _inserir_manutencoes_demo(session: Session) -> None:
     """Insere os registros de exemplo apenas uma vez na vida do banco."""
     controle = session.get(ControleInicializacao, 1)
@@ -114,7 +210,22 @@ def _inserir_manutencoes_demo(session: Session) -> None:
         session.flush()
 
     if not controle.manutencoes_demo_inseridas:
-        session.add_all(Manutencao(**dados) for dados in MANUTENCOES_DEMO)
+        maquinas = {}
+        for nome, setor in MAQUINAS_DEMO:
+            maquina = session.exec(select(Maquina).where(Maquina.nome == nome)).first()
+            if maquina is None:
+                maquina = Maquina(nome=nome, setor=setor)
+                session.add(maquina)
+                session.flush()  # Gera o ``id`` usado pelas manutenções abaixo.
+            maquinas[nome] = maquina.id
+
+        session.add_all(
+            Manutencao(
+                maquina_id=maquinas[dados["maquina"]],
+                **{campo: valor for campo, valor in dados.items() if campo != "maquina"},
+            )
+            for dados in MANUTENCOES_DEMO
+        )
         controle.manutencoes_demo_inseridas = True
 
 

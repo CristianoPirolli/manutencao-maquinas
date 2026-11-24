@@ -47,23 +47,33 @@ HTTP e mantém cada endpoint com poucas linhas.
 
 ```mermaid
 flowchart TD
-    main[main.py] --> autenticacao & usuarios & manutencoes & auditoria
-    manutencoes --> autenticacao
+    main[main.py] --> autenticacao & usuarios & maquinas & manutencoes & auditoria
+    maquinas & manutencoes --> autenticacao
     usuarios --> autenticacao
     auditoria_r[auditoria.router] --> autenticacao
     autenticacao --> usuarios_m[usuarios.models / service]
     autenticacao --> auditoria_s[auditoria.service]
-    manutencoes --> auditoria_s
-    usuarios --> auditoria_s
+    manutencoes --> maquinas_m[maquinas.models]
+    maquinas --> manutencoes_m[manutencoes.models]
+    maquinas & manutencoes & usuarios --> auditoria_s
     subgraph core
       config --> security
       config --> database
     end
-    autenticacao & usuarios & manutencoes & auditoria --> core
+    autenticacao & usuarios & maquinas & manutencoes & auditoria --> core
 ```
 
-Não há ciclos: `auditoria.service` e `usuarios.models` são "folhas" usadas pelos
-demais apps.
+Não há ciclos: `auditoria.service` e os arquivos `models.py` são "folhas" usadas
+pelos demais apps. `maquinas` e `manutencoes` dependem apenas dos *models* um do
+outro (para o JOIN e para a contagem), nunca dos services ou routers.
+
+### Migração do campo `maquina` (texto) para a tabela `maquina`
+
+Bancos criados antes do cadastro de máquinas guardavam o nome da máquina como
+texto em cada manutenção. Na subida, `core/inicializacao.py` detecta esse
+formato e, em uma transação: faz uma cópia do arquivo (`manutencao.pre-maquinas.db`),
+cria uma máquina para cada nome distinto, reconstrói a tabela `manutencao` com
+`maquina_id` e confere se a quantidade de registros se manteve.
 
 ### Frontend
 

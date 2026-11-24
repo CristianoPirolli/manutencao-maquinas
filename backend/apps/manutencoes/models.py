@@ -6,8 +6,8 @@ MER da tabela ``manutencao`` (substitui a tabela ``venda`` do roteiro original):
 Campo               Tipo             Regra
 ==================  ===============  ===========================================
 id                  INTEGER          Chave primária
-maquina             VARCHAR(100)     Obrigatório, não pode ser só espaços
-tipo                VARCHAR          preventiva, corretiva ou preditiva
+maquina_id          INTEGER          Chave estrangeira para ``maquina.id``
+tipo              VARCHAR          preventiva, corretiva ou preditiva
 data_manutencao     DATE             Não pode estar no futuro
 custo               NUMERIC(10,2)    Maior que zero
 horas_paradas       NUMERIC(6,1)     Zero ou mais
@@ -38,20 +38,11 @@ class ManutencaoBase(SQLModel):
     ``POST`` e ``PUT``, garantindo que as mesmas regras valham nos dois casos.
     """
 
-    maquina: str = Field(min_length=1, max_length=100)
+    maquina_id: int = Field(foreign_key="maquina.id", index=True, gt=0)
     tipo: TipoManutencao = Field(sa_type=String)
     data_manutencao: date
     custo: Decimal = Field(gt=Decimal("0"), max_digits=10, decimal_places=2)
     horas_paradas: Decimal = Field(ge=Decimal("0"), max_digits=6, decimal_places=1)
-
-    @field_validator("maquina")
-    @classmethod
-    def validar_maquina(cls, valor: str) -> str:
-        """Remove espaços das pontas e rejeita nomes vazios."""
-        valor = valor.strip()
-        if not valor:
-            raise ValueError("O nome da máquina não pode ficar vazio ou conter apenas espaços.")
-        return valor
 
     @field_validator("tipo", mode="before")
     @classmethod
