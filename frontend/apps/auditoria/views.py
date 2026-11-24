@@ -46,6 +46,9 @@ def _montar_dataframe(logs: list[dict]) -> pd.DataFrame:
     df["data_hora"] = datas.dt.tz_convert(None)
     df["operacao"] = df["operacao"].map(lambda op: _OPERACOES.get(op, op))
     df["resultado"] = df["resultado"].str.capitalize()
+    # Sem registro (ex.: login), o id vem nulo; um traço evita que a tabela
+    # exiba o marcador "None".
+    df["recurso_id"] = df["recurso_id"].map(lambda i: "—" if pd.isna(i) else str(int(i)))
     return df
 
 
@@ -98,7 +101,7 @@ def renderizar_auditoria() -> None:
             "usuario": st.column_config.TextColumn("Usuário"),
             "operacao": st.column_config.TextColumn("Operação"),
             "recurso": st.column_config.TextColumn("Recurso"),
-            "recurso_id": st.column_config.NumberColumn("Registro", format="%d"),
+            "recurso_id": st.column_config.TextColumn("Registro", width="small"),
             "resultado": st.column_config.TextColumn("Resultado"),
             "detalhes": st.column_config.TextColumn("Detalhes", width="large"),
         },

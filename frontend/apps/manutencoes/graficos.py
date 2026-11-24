@@ -46,9 +46,12 @@ def horas_por_maquina(df: pd.DataFrame) -> alt.Chart:
 
     grafico = (
         alt.Chart(df)
-        .mark_bar(height=22, cornerRadiusEnd=2)
+        .mark_bar(cornerRadiusEnd=2)
         .encode(
-            y=alt.Y("maquina:N", sort=ordem, title=None, axis=alt.Axis(labelLimit=220)),
+            y=alt.Y(
+                "maquina:N", sort=ordem, title=None, axis=alt.Axis(labelLimit=220),
+                scale=alt.Scale(paddingInner=0.4),
+            ),
             x=alt.X("sum(horas):Q", title="Horas paradas", axis=alt.Axis(tickMinStep=1)),
             color=alt.Color(
                 "tipo:N", scale=_ESCALA_TIPO,
@@ -61,7 +64,10 @@ def horas_por_maquina(df: pd.DataFrame) -> alt.Chart:
                 alt.Tooltip("sum(horas):Q", title="Horas paradas", format=".1f"),
             ],
         )
-        .properties(height=max(160, 44 * len(ordem)))
+        # Altura por faixa: o gráfico cresce com o número de máquinas. Uma
+        # altura total fixa é dividida também com legenda e eixo, espremendo
+        # as barras quando há muitas máquinas.
+        .properties(height=alt.Step(44))
     )
     return _estilizar(grafico)
 

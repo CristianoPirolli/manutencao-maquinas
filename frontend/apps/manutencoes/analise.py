@@ -6,6 +6,7 @@ do painel. Não depende do Streamlit, o que facilita testes e reuso.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from datetime import date
 
@@ -116,10 +117,18 @@ def _numero(valor: object) -> float | None:
     """Converte o texto decimal da API em ``float`` (``None`` se vier nulo)."""
     if valor is None:
         return None
-    decimal = valor_decimal(valor)
-    if decimal is None:
+    # Não usa ``valor_decimal``: ele arredonda para centavos e transformaria
+    # a disponibilidade 0,976 em 0,98.
+    numero = float(str(valor))
+    if not math.isfinite(numero):
         raise ValueError("indicador inválido")
-    return float(decimal)
+    return numero
+
+
+def _percentual_ou_nulo(valor: object) -> float | None:
+    """Fração de 0 a 1 da API convertida em percentual (0,976 vira 97,6)."""
+    numero = _numero(valor)
+    return None if numero is None else round(numero * 100, 1)
 
 
 def tabela_confiabilidade(indicadores: list[dict]) -> pd.DataFrame:
@@ -141,7 +150,7 @@ def tabela_confiabilidade(indicadores: list[dict]) -> pd.DataFrame:
             "falhas": int(item["falhas"]),
             "mttr": _numero(item["mttr_horas"]),
             "mtbf": _numero(item["mtbf_horas"]),
-            "disponibilidade": _numero(item["disponibilidade"]),
+            "disponibilidade": _percentual_ou_nulo(item["disponibilidade"]),
         })
 
     df = pd.DataFrame(linhas, columns=COLUNAS_CONFIABILIDADE)

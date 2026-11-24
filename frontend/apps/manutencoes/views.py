@@ -218,7 +218,7 @@ def _confiabilidade() -> None:
                      "corretivas seguidas. Precisa de pelo menos duas falhas.",
             ),
             "disponibilidade": st.column_config.ProgressColumn(
-                "Disponibilidade", format="percent", min_value=0.0, max_value=1.0,
+                "Disponibilidade", format="%.1f%%", min_value=0.0, max_value=100.0,
                 help="MTBF ÷ (MTBF + MTTR). Precisa de pelo menos duas falhas.",
             ),
         },
