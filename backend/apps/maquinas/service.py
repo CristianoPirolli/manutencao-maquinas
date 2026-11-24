@@ -9,8 +9,9 @@ from sqlalchemy import func
 from sqlmodel import Session, select
 
 from backend.apps.auditoria.service import registrar_auditoria
+from backend.apps.maquinas.indicadores import Falha, calcular
 from backend.apps.maquinas.models import Maquina, MaquinaBase
-from backend.apps.maquinas.schemas import MaquinaSaida
+from backend.apps.maquinas.schemas import IndicadoresMaquina, MaquinaSaida
 from backend.apps.manutencoes.models import Manutencao
 
 _RECURSO = "maquina"
@@ -55,6 +56,39 @@ def listar(session: Session) -> list[MaquinaSaida]:
         MaquinaSaida(id=m.id, nome=m.nome, setor=m.setor, total_manutencoes=qtd)
         for m, qtd in linhas
     ]
+
+
+def indicadores(session: Session) -> list[IndicadoresMaquina]:
+    """MTTR, MTBF e disponibilidade de cada máquina, a partir das corretivas.
+
+    As fórmulas estão em :mod:`backend.apps.maquinas.indicadores`. Máquinas
+    sem falhas também aparecem, com os indicadores nulos.
+    """
+    corretivas = session.exec(
+        select(Manutencao.maquina_id, Manutencao.data_manutencao, Manutencao.horas_paradas)
+        .where(Manutencao.tipo == "corretiva")
+    ).all()
+
+    falhas_por_maquina: dict[int, list[Falha]] = {}
+    for maquina_id, data, horas in corretivas:
+        falhas_por_maquina.setdefault(maquina_id, []).append(Falha(data, horas))
+
+    maquinas = session.exec(select(Maquina).order_by(func.lower(Maquina.nome))).all()
+    resultado = []
+    for maquina in maquinas:
+        calculo = calcular(falhas_por_maquina.get(maquina.id, []))
+        resultado.append(
+            IndicadoresMaquina(
+                maquina_id=maquina.id,
+                maquina=maquina.nome,
+                setor=maquina.setor,
+                falhas=calculo.falhas,
+                mttr_horas=calculo.mttr_horas,
+                mtbf_horas=calculo.mtbf_horas,
+                disponibilidade=calculo.disponibilidade,
+            )
+        )
+    return resultado
 
 
 def obter(session: Session, id_maquina: int) -> Maquina:

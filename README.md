@@ -168,7 +168,7 @@ manutencao/
 │   └── apps/                     # Módulos de domínio
 │       ├── autenticacao/         # /token, /refresh, /logout + dependência de auth
 │       ├── usuarios/             # /usuarios, /me
-│       ├── maquinas/             # CRUD /maquinas
+│       ├── maquinas/             # CRUD /maquinas + indicadores MTTR/MTBF
 │       ├── manutencoes/          # CRUD /manutencoes
 │       └── auditoria/            # /auditoria
 │           # Cada app: models.py · schemas.py · service.py · router.py
@@ -261,7 +261,7 @@ streamlit run frontend/app.py
 - Interface: <http://localhost:8501> (abre automaticamente no navegador)
 
 Na primeira execução o backend cria o banco `manutencao.db` na raiz do projeto,
-com **5 manutenções de exemplo** e o **usuário administrador**.
+com **4 máquinas e 8 manutenções de exemplo** e o **usuário administrador**.
 
 ---
 
@@ -349,6 +349,11 @@ advertência amarela, e cada tipo de manutenção com sua cor —
   horas paradas e o peso das corretivas no custo; abaixo, os indicadores (custo
   acumulado, horas paradas, intervenções e custo médio), a proporção por tipo e
   os gráficos de horas paradas por máquina e de custo por mês.
+- **Confiabilidade por máquina** (na Visão geral): **MTTR** (tempo médio de
+  reparo), **MTBF** (tempo médio entre falhas) e **disponibilidade**
+  = MTBF ÷ (MTBF + MTTR). Só as corretivas contam como falha; o MTBF precisa
+  de pelo menos duas. A máquina menos disponível aparece primeiro. Fórmulas
+  em [`backend/apps/maquinas/indicadores.py`](backend/apps/maquinas/indicadores.py).
 - **Registros** e **Máquinas** seguem o mesmo CRUD: uma barra fixa acima da
   tabela com **Nova**, **Editar** e **Excluir**. Selecione uma linha para
   habilitar Editar e Excluir; cada ação abre uma janela, e a exclusão pede

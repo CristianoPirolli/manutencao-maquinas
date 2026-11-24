@@ -5,7 +5,11 @@ from fastapi import APIRouter, Security, status
 from backend.apps.autenticacao.dependencies import UsuarioAtual, obter_usuario_atual
 from backend.apps.maquinas import service
 from backend.apps.maquinas.models import MaquinaBase
-from backend.apps.maquinas.schemas import MaquinaOperacaoResponse, MaquinaSaida
+from backend.apps.maquinas.schemas import (
+    IndicadoresMaquina,
+    MaquinaOperacaoResponse,
+    MaquinaSaida,
+)
 from backend.core.database import SessionDep
 from backend.core.schemas import MensagemResponse
 
@@ -19,6 +23,19 @@ def listar_maquinas(
 ):
     """Lista as máquinas em ordem alfabética, com o total de manutenções."""
     return service.listar(session)
+
+
+# Declarada antes de ``/{id_maquina}``: as rotas são testadas em ordem e
+# "indicadores" seria recusado como id inválido.
+@router.get("/indicadores", response_model=list[IndicadoresMaquina])
+def indicadores_confiabilidade(
+    session: SessionDep,
+    _usuario: UsuarioAtual = Security(
+        obter_usuario_atual, scopes=["maquinas:read", "manutencoes:read"]
+    ),
+):
+    """MTTR, MTBF e disponibilidade de cada máquina (só corretivas contam como falha)."""
+    return service.indicadores(session)
 
 
 @router.get("/{id_maquina}", response_model=MaquinaSaida)

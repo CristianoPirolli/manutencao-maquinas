@@ -15,6 +15,7 @@ from frontend.apps.manutencoes.analise import (
     frases_destaque,
     montar_dataframe,
     proporcao_por_tipo,
+    tabela_confiabilidade,
 )
 from frontend.apps.manutencoes.formulario import manutencao_completa, validar_formulario
 from frontend.core.api_client import requisitar_api, validar_resposta_json
@@ -166,6 +167,62 @@ def renderizar_visao_geral() -> None:
     with col_custo:
         st.subheader("Custo por mês")
         st.altair_chart(graficos.custo_por_mes(df), width="stretch")
+
+    if possui_scope("maquinas:read"):
+        _confiabilidade()
+
+
+def _confiabilidade() -> None:
+    """MTTR, MTBF e disponibilidade por máquina (só corretivas contam como falha)."""
+    response = requisitar_api("GET", "/maquinas/indicadores", autenticada=True, verificar_status=False)
+    indicadores = validar_resposta_json(
+        response, contexto="os indicadores de confiabilidade", tipo_esperado=list
+    )
+    if indicadores is None:
+        return
+    try:
+        df = tabela_confiabilidade(indicadores)
+    except (KeyError, TypeError, ValueError):
+        st.error("A API retornou indicadores de confiabilidade em formato inválido.")
+        return
+
+    st.subheader("Confiabilidade por máquina")
+    if df.empty:
+        st.info(
+            "Nenhuma manutenção corretiva registrada. MTTR e MTBF são calculados a partir das falhas.",
+            icon=":material/verified:",
+        )
+        return
+
+    st.caption(
+        "Só as manutenções corretivas contam como falha. A máquina menos disponível aparece primeiro."
+    )
+    st.dataframe(
+        df,
+        hide_index=True,
+        width="stretch",
+        height=min(420, 38 + 35 * len(df)),
+        row_height=35,
+        column_config={
+            "maquina": st.column_config.TextColumn("Máquina", width="large"),
+            "falhas": st.column_config.NumberColumn(
+                "Falhas", format="%d", help="Quantidade de manutenções corretivas."
+            ),
+            "mttr": st.column_config.NumberColumn(
+                "MTTR", format="%.1f h",
+                help="Tempo médio de reparo: horas paradas nas falhas ÷ número de falhas.",
+            ),
+            "mtbf": st.column_config.NumberColumn(
+                "MTBF", format="%.1f h",
+                help="Tempo médio entre falhas: média das horas de funcionamento entre duas "
+                     "corretivas seguidas. Precisa de pelo menos duas falhas.",
+            ),
+            "disponibilidade": st.column_config.ProgressColumn(
+                "Disponibilidade", format="percent", min_value=0.0, max_value=1.0,
+                help="MTBF ÷ (MTBF + MTTR). Precisa de pelo menos duas falhas.",
+            ),
+        },
+    )
 
 
 # --------------------------------------------------------------------------- #

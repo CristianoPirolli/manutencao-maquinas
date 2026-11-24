@@ -103,3 +103,48 @@ def proporcao_por_tipo(df: pd.DataFrame) -> list[FatiaTipo]:
         FatiaTipo(tipo, int(contagem.get(tipo, 0)), (contagem.get(tipo, 0) / total) if total else 0.0)
         for tipo in TIPOS_MANUTENCAO
     ]
+
+
+# --------------------------------------------------------------------------- #
+# Confiabilidade (MTTR / MTBF)
+# --------------------------------------------------------------------------- #
+
+COLUNAS_CONFIABILIDADE = ["maquina", "falhas", "mttr", "mtbf", "disponibilidade"]
+
+
+def _numero(valor: object) -> float | None:
+    """Converte o texto decimal da API em ``float`` (``None`` se vier nulo)."""
+    if valor is None:
+        return None
+    decimal = valor_decimal(valor)
+    if decimal is None:
+        raise ValueError("indicador inválido")
+    return float(decimal)
+
+
+def tabela_confiabilidade(indicadores: list[dict]) -> pd.DataFrame:
+    """Monta a tabela de ``GET /maquinas/indicadores`` para exibição.
+
+    Mantém só as máquinas com pelo menos uma falha e ordena da menos para a
+    mais disponível, para que a máquina mais crítica apareça primeiro.
+
+    :raises ValueError: se algum item vier com estrutura ou valor inválido.
+    """
+    linhas = []
+    for item in indicadores:
+        if not isinstance(item, dict):
+            raise ValueError("estrutura inválida")
+        if int(item["falhas"]) == 0:
+            continue
+        linhas.append({
+            "maquina": str(item["maquina"]),
+            "falhas": int(item["falhas"]),
+            "mttr": _numero(item["mttr_horas"]),
+            "mtbf": _numero(item["mtbf_horas"]),
+            "disponibilidade": _numero(item["disponibilidade"]),
+        })
+
+    df = pd.DataFrame(linhas, columns=COLUNAS_CONFIABILIDADE)
+    return df.sort_values(
+        ["disponibilidade", "mttr"], ascending=[True, False], na_position="last"
+    ).reset_index(drop=True)

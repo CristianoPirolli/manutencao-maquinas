@@ -50,7 +50,15 @@ MAQUINAS_DEMO: tuple[tuple[str, str], ...] = (
 )
 
 #: Manutenções de exemplo; ``maquina`` é o nome de uma das máquinas acima.
+#: Bobinadeira, MP-2 e Cortadeira têm mais de uma corretiva, para que o
+#: MTBF (que precisa de duas falhas) apareça já na primeira execução.
 MANUTENCOES_DEMO: tuple[dict, ...] = (
+    {"maquina": "Bobinadeira 01", "tipo": "corretiva", "data_manutencao": date(2026, 8, 12),
+     "custo": Decimal("1940.00"), "horas_paradas": Decimal("6.0")},
+    {"maquina": "Máquina de papel MP-2", "tipo": "corretiva", "data_manutencao": date(2026, 8, 25),
+     "custo": Decimal("7600.00"), "horas_paradas": Decimal("11.0")},
+    {"maquina": "Cortadeira CT-3", "tipo": "corretiva", "data_manutencao": date(2026, 9, 29),
+     "custo": Decimal("980.00"), "horas_paradas": Decimal("2.5")},
     {"maquina": "Bobinadeira 01", "tipo": "preventiva", "data_manutencao": date(2026, 9, 2),
      "custo": Decimal("850.00"), "horas_paradas": Decimal("4.0")},
     {"maquina": "Máquina de papel MP-2", "tipo": "corretiva", "data_manutencao": date(2026, 9, 18),

@@ -52,6 +52,7 @@ Resposta de `/token` e `/refresh`:
 | Método | Rota | Scope | Descrição |
 |---|---|---|---|
 | GET | `/maquinas` | `maquinas:read` | Lista em ordem alfabética, com `total_manutencoes` |
+| GET | `/maquinas/indicadores` | `maquinas:read` + `manutencoes:read` | MTTR, MTBF e disponibilidade de cada máquina |
 | GET | `/maquinas/{id}` | `maquinas:read` | Uma máquina (404 se não existir) |
 | POST | `/maquinas` | `maquinas:create` | Cadastra (201; 409 se o nome já existir) |
 | PUT | `/maquinas/{id}` | `maquinas:update` | Altera nome e setor (409 se o nome já existir) |
@@ -66,13 +67,30 @@ Corpo de `POST` / `PUT`: `{"nome": "Prensa hidráulica PH-4", "setor": "Prensage
 ]
 ```
 
+### Indicadores de confiabilidade
+
+`GET /maquinas/indicadores` considera **só as manutenções corretivas** como falha:
+
+| Campo | Fórmula | Nulo quando |
+|---|---|---|
+| `mttr_horas` | horas paradas nas falhas ÷ número de falhas | nenhuma falha |
+| `mtbf_horas` | média, entre falhas seguidas, de (dias entre elas × 24 − horas paradas na primeira) | menos de 2 falhas |
+| `disponibilidade` | MTBF ÷ (MTBF + MTTR), de 0 a 1 | menos de 2 falhas |
+
+```json
+[
+  {"maquina_id": 1, "maquina": "Bobinadeira 01", "setor": "Acabamento", "falhas": 2,
+   "mttr_horas": "7.3", "mtbf_horas": "2154.0", "disponibilidade": "0.997"}
+]
+```
+
 ## Manutenções
 
 | Método | Rota | Scope | Descrição |
 |---|---|---|---|
 | GET | `/manutencoes` | `manutencoes:read` | Todas, no formato `{id: manutencao}` |
-| GET | `/manutencoes/qtd` | `manutencoes:read` | `{"quantidade_total": 5}` |
-| GET | `/manutencoes/resumo` | `manutencoes:read` | `{"custo_total": "20580.50", "horas_paradas_total": "35.0", "moeda": "R$"}` |
+| GET | `/manutencoes/qtd` | `manutencoes:read` | `{"quantidade_total": 8}` |
+| GET | `/manutencoes/resumo` | `manutencoes:read` | `{"custo_total": "31100.50", "horas_paradas_total": "54.5", "moeda": "R$"}` |
 | GET | `/manutencoes/busca` | `manutencoes:read` | Filtros `maquina` (trecho do nome), `maquina_id`, `tipo`, `min_horas`; mais recentes primeiro |
 | GET | `/manutencoes/{id}` | `manutencoes:read` | Uma manutenção (404 se não existir) |
 | POST | `/manutencoes` | `manutencoes:create` | Cria (201; 422 se a máquina não existir) |
