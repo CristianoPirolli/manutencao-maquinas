@@ -25,10 +25,11 @@ industriais**.
 3. [Estrutura do projeto](#-estrutura-do-projeto)
 4. [Instalação](#-instalação)
 5. [Execução](#-execução)
-6. [Usando o sistema](#-usando-o-sistema)
-7. [Configuração](#%EF%B8%8F-configuração)
-8. [Solução de problemas](#-solução-de-problemas)
-9. [Documentação complementar](#-documentação-complementar)
+6. [Execução com Docker](#-execução-com-docker)
+7. [Usando o sistema](#-usando-o-sistema)
+8. [Configuração](#%EF%B8%8F-configuração)
+9. [Solução de problemas](#-solução-de-problemas)
+10. [Documentação complementar](#-documentação-complementar)
 
 ---
 
@@ -191,8 +192,13 @@ manutencao/
 ├── docs/
 │   ├── ARQUITETURA.md            # Decisões de arquitetura e fluxos
 │   └── API.md                    # Referência dos endpoints
-└── requirements.txt              # Dependências do projeto
+├── docker-compose.yml            # Sobe API e interface em containers separados
+├── .env.example                  # Modelo de variáveis de ambiente
+└── requirements.txt              # Dependências do projeto (inclui as duas partes)
 ```
+
+`backend/` e `frontend/` têm cada um o seu `requirements.txt` e o seu
+`Dockerfile`, de modo que cada lado pode ser instalado e publicado sozinho.
 
 ---
 
@@ -256,6 +262,57 @@ streamlit run frontend/app.py
 
 Na primeira execução o backend cria o banco `manutencao.db` na raiz do projeto,
 com **5 manutenções de exemplo** e o **usuário administrador**.
+
+---
+
+## 🐳 Execução com Docker
+
+Alternativa que dispensa Python e ambiente virtual: só é preciso o
+[Docker Desktop](https://www.docker.com/products/docker-desktop/) aberto.
+
+```bash
+docker compose up --build
+```
+
+- Interface: <http://localhost:8501>
+- API (Swagger): <http://localhost:8000/docs>
+
+O Compose sobe **dois containers independentes**, cada um com a sua imagem, que
+só se comunicam por HTTP. É o mesmo desenho do sistema distribuído, agora
+isolado em "máquinas" separadas:
+
+```mermaid
+flowchart LR
+    U([Navegador]) -->|:8501| W[container web<br/>Streamlit]
+    U -->|:8000 /docs| A
+    W -->|http://api:8000| A[container api<br/>FastAPI]
+    A --> V[(volume dados<br/>manutencao.db)]
+```
+
+- Dentro da rede do Compose, a interface encontra a API pelo nome do serviço
+  (`API_URL=http://api:8000`).
+- A interface só sobe depois que a API responde ao *health check*.
+- O banco fica no volume `dados`, então os registros continuam lá depois de
+  `docker compose down`. Para começar do zero: `docker compose down -v`.
+- Os containers rodam com um usuário sem privilégios de administrador.
+
+| Comando | Efeito |
+|---|---|
+| `docker compose up --build -d` | Sobe em segundo plano |
+| `docker compose logs -f api` | Acompanha os logs da API |
+| `docker compose down` | Para os containers (mantém os dados) |
+| `docker compose down -v` | Para e apaga o banco |
+
+Para trocar a chave dos tokens ou a senha inicial do admin, copie
+`.env.example` para `.env` e preencha. Se as portas 8000 ou 8501 já estiverem
+em uso (por exemplo, pela execução local), troque-as na hora de subir:
+
+```bash
+# Linux / macOS / Git Bash
+API_PORT=8010 WEB_PORT=8511 docker compose up --build
+# Windows (PowerShell)
+$env:API_PORT=8010; $env:WEB_PORT=8511; docker compose up --build
+```
 
 ---
 
@@ -351,6 +408,8 @@ API_URL=http://192.168.0.10:8000 streamlit run frontend/app.py
 | Sintoma | Causa provável | Solução |
 |---|---|---|
 | `ModuleNotFoundError: No module named 'backend'` | Comando executado fora da raiz | Rode o `uvicorn` a partir da pasta do projeto |
+| `failed to connect to the docker API` | Docker Desktop fechado | Abra o Docker Desktop e aguarde o ícone ficar verde |
+| `port is already allocated` | Porta 8000 ou 8501 em uso (ex.: execução local aberta) | Pare a execução local ou use `API_PORT` / `WEB_PORT` |
 | Frontend mostra **🔴 API indisponível** | Backend parado ou em outra porta | Inicie o backend ou ajuste `API_URL` |
 | `ImportError: DLL load failed ... política de Controle de Aplicativo` | *Smart App Control* do Windows bloqueando extensões compiladas do SQLAlchemy | Reinstale sem extensões C: `set DISABLE_SQLALCHEMY_CEXT=1` e `pip install --force-reinstall --no-binary sqlalchemy sqlalchemy` |
 | `RuntimeError: Já existe 'admin' com perfil comum` | Usuário comum criado com o login do admin | Use outro `ADMIN_USERNAME` ou apague `manutencao.db` |

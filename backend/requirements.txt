@@ -1,0 +1,7 @@
+# Dependências do backend (FastAPI). Usado também pela imagem Docker da API.
+fastapi>=0.115
+uvicorn>=0.30
+sqlmodel>=0.0.22
+pwdlib[argon2]>=0.2
+pyjwt>=2.9
+python-multipart>=0.0.9

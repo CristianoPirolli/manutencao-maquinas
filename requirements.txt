@@ -1,15 +1,5 @@
-# Dependências de execução (backend + frontend).
-# Versões mínimas testadas com Python 3.14.
-
-# Backend
-fastapi>=0.115
-uvicorn>=0.30
-sqlmodel>=0.0.22
-pwdlib[argon2]>=0.2
-pyjwt>=2.9
-python-multipart>=0.0.9
-
-# Frontend
-streamlit>=1.50
-requests>=2.32
-pandas>=2.2
+# Dependências de execução (backend + frontend) para rodar tudo em um único
+# ambiente virtual. Versões mínimas testadas com Python 3.14.
+# Cada lado também tem o próprio arquivo, usado pelas imagens Docker.
+-r backend/requirements.txt
+-r frontend/requirements.txt

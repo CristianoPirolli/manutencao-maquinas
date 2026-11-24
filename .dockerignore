@@ -1,0 +1,15 @@
+# Mantém fora do contexto de build o que não pertence às imagens.
+.git
+.venv
+venv
+env
+**/__pycache__
+**/*.py[cod]
+*.db
+*.db-journal
+.env
+.streamlit/secrets.toml
+docs
+README.md
+.vscode
+.idea
